@@ -1,14 +1,12 @@
 # KriptoKurdu'nun Aztec Sequencer Node Kurulum Rehberi
 
 <p align="center">
-  <img src="https://i.imgyukle.com/2025/05/09/Ctpt76.png" alt="KriptoKurdu Logo" width="200"/>
+  <a href="https://ibb.co/TqwZkSB8"><img src="https://i.ibb.co/x82yD0Sj/Ads-z-tasar-m-19.png" alt="Ads-z-tasar-m-19" border="0"></a>
 </p>
 
 <p align="center">
   <strong>KriptoKurdu ekibi tarafından hazırlanan Aztec Sequencer Node kurulum rehberi</strong>
 </p>
-
----
 
 ---
 
