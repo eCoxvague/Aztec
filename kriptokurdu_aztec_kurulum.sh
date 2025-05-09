@@ -43,9 +43,15 @@ apt-get update && apt-get upgrade -y
 echo -e "${SARI}📚 Gerekli paketler yükleniyor...${SIFIR}"
 apt install -y curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
 
-# Docker kurulumu
-echo -e "${SARI}🐳 Docker kuruluyor...${SIFIR}"
-apt install -y docker.io
+# Docker kurulumundan önce çakışan paketleri temizleyelim
+echo -e "${SARI}🧹 Mevcut containerd paketleri kaldırılıyor...${SIFOR}"
+apt-get remove --purge -y containerd containerd.io
+apt-get update
+apt-get -f install
+
+# Sonra Docker’ı yükleyin
+echo -e "${SARI}🐳 Docker kuruluyor...${SIFOR}"
+apt-get install -y docker.io
 
 # Aztec CLI yükleme
 echo -e "${SARI}🚀 Aztec CLI kuruluyor...${SIFIR}"
