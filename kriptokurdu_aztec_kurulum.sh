@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# --- PATH'i en başta doğru ayarlıyoruz ---
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
+clear
+
 # Renk tanımları
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -9,9 +14,8 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # Renk sıfırlama
 
-clear
-
-cat << "EOF"
+# Banner: artık değişkenler genişliyor
+cat << EOF
 ${CYAN}╔════════════════════════════════════════════════════════════╗
               ${BLUE}K R İ P T O K U R D U   N O D E
               ${MAGENTA}by KriptoKurdu${CYAN}
@@ -33,20 +37,29 @@ cd ~
 echo -e "${YELLOW}📦 Sistem paketleri güncelleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 
+echo -e "${YELLOW}📚 Eski containerd paketleri kaldırılıyor (çatışma önlemi)...${NC}"
+apt-get remove -y containerd containerd.io runc
+
 echo -e "${YELLOW}📚 Gerekli bağımlılıklar kuruluyor...${NC}"
 apt install -y \
   curl iptables build-essential git wget lz4 jq make gcc nano \
   automake autoconf tmux htop nvme-cli libgbm1 pkg-config \
-  libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip docker.io
+  libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
 
 echo -e "${GREEN}✅ Bağımlılıklar başarıyla kuruldu${NC}"
+
+echo -e "${YELLOW}🐳 Docker kuruluyor...${NC}"
+apt install -y docker.io
+
+echo -e "${GREEN}✅ Docker kuruldu${NC}"
 
 echo -e "${YELLOW}🚀 Aztec CLI yüklemesi başlatılıyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
 
-# PATH güncellemesi
+# PATH güncellemesi (CLI bin dizinini hemen aktif edelim)
+export PATH="$HOME/.aztec/bin:$PATH"
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+
 echo -e "${GREEN}✅ Aztec CLI yüklendi ve PATH güncellendi${NC}"
 
 echo -e "${YELLOW}⚙️  Aztec CLI alpha-testnet için başlatılıyor...${NC}"
@@ -81,11 +94,11 @@ do
 done
 
 if [ -z "$BEACON_URL" ]; then
-  echo -e "${RED}❌ Çalışan Beacon RPC uç noktası bulunamadı. Betik sonlandırılıyor.${NC}"
+  echo -e "${RED}❌ Çalışan Beacon RPC bulunamadı. Betik sonlandırılıyor.${NC}"
   exit 1
 fi
 
-# Validator özel anahtar (gizli giriş)
+# Validator özel anahtar (gizli)
 read -s -p "$(echo -e ${CYAN}🔑 Validator özel anahtarınızı girin:${NC} )" PRIVATE_KEY
 echo
 
@@ -98,7 +111,7 @@ export ETH_RPC_URL="$RPC_URL"
 export ETH_BEACON_RPC_URL="$BEACON_URL"
 export LOCAL_IP="$PUBLIC_IP"
 
-# Aztec node’u başlat
+# Node’u başlat
 echo -e "${YELLOW}🚦 Aztec node başlatılıyor...${NC}"
 aztec start \
   --network alpha-testnet \
