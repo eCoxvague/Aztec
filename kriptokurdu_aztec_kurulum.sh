@@ -86,6 +86,7 @@ fi
 # Docker konteynerlerini temizle
 if command -v docker &> /dev/null; then
     echo -e "${BEYAZ}Aztec Docker konteynerleri temizleniyor...${RESET}"
+    docker rm -f aztec-node &>/dev/null || true
     docker rm -f $(docker ps -a -q --filter ancestor=aztecprotocol/aztec:latest) &>/dev/null || true
     echo -e "${YESIL}✅ Docker konteynerleri temizlendi${RESET}"
 fi
@@ -214,7 +215,7 @@ echo -e "${BEYAZ}🌍 Ethereum Sepolia RPC URL'nizi girin (veya varsayılan içi
 echo -e "${SARI}(Buradan alabilirsiniz: https://dashboard.alchemy.com/apps/)${RESET}"
 read -r RPC_URL
 if [ -z "$RPC_URL" ]; then
-    RPC_URL="https://rpc.sepolia.org"
+    RPC_URL="https://eth-beacon-chain-sepolia.drpc.org/rest/"
     echo -e "${SARI}Varsayılan RPC URL kullanılıyor: $RPC_URL${RESET}"
 fi
 
@@ -233,7 +234,7 @@ if [ -z "$LOCAL_IP" ]; then
     echo -e "${SARI}Otomatik tespit edilen IP kullanılıyor: $LOCAL_IP${RESET}"
 fi
 
-echo -e "${BEYAZ}🔑 Validator özel anahtarınızı girin (0x ile başlayan):${RESET}"
+echo -e "${BEYAZ}🔑 Özel anahtarınızı girin (Private Key):${RESET}"
 read -r PRIVATE_KEY
 
 # Özel anahtar formatını kontrol et
@@ -254,44 +255,65 @@ if [[ ! "$CONSENSUS_URL" =~ ^https?:// ]]; then
 fi
 
 echo -e "\n${TURKUAZ}══════════ Aztec Node Başlatılıyor ══════════${RESET}"
-echo -e "${BEYAZ}Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
+echo -e "${BEYAZ}Docker ile Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
 echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse endişelenmeyin, bu normaldir.${RESET}"
 
-# Screen oturumu oluştur
-echo -e "${BEYAZ}Screen oturumu oluşturuluyor...${RESET}"
-screen -dmS aztec bash -c "
-# Aztec node'u tam parametrelerle başlat
-if ! aztec start \
-  --network alpha-testnet \
-  --l1-rpc-urls \"$RPC_URL\" \
-  --l1-consensus-host-urls \"$CONSENSUS_URL\" \
-  --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" \
-  --sequencer.coinbase \"$COINBASE\" \
-  --p2p.p2pIp \"$LOCAL_IP\" \
-  --p2p.maxTxPoolSize 1000000000 \
-  --archiver \
-  --node \
-  --sequencer; then
-    
-    echo -e \"${SARI}⚠️ Tam parametreli başlatma başarısız oldu, daha basit bir yapılandırma ile deneniyor...${RESET}\"
-    
-    # Önceki verileri temizleme
-    rm -rf ~/.aztec/alpha-testnet/data/archiver
-    
-    # Daha basit yapılandırma ile başlatmayı dene
-    aztec start --network alpha-testnet --node --archiver
-fi
-"
-echo -e "${YESIL}✅ Node başlatıldı ve arka planda çalışıyor (Screen oturumu: aztec)${RESET}"
+# Docker varsa eski konteyneri kaldır
+docker rm -f aztec-node &>/dev/null || true
+
+# Docker ile doğrudan başlat
+echo -e "${BEYAZ}Docker ile node başlatılıyor...${RESET}"
+docker run -d \
+  --name aztec-node \
+  -p 8080:8080 \
+  -p 40400:40400/tcp \
+  -p 40400:40400/udp \
+  -p 40500:40500 \
+  -e DATA_DIRECTORY=/data \
+  -e LOG_LEVEL=debug \
+  -v /root/aztec-data:/data \
+  aztecprotocol/aztec:latest \
+  node /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node --archiver --sequencer \
+  --l1-rpc-urls "$RPC_URL" \
+  --l1-consensus-host-urls "$CONSENSUS_URL" \
+  --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+  --sequencer.coinbase "$COINBASE" \
+  --p2p.p2pIp "$LOCAL_IP" \
+  --p2p.maxTxPoolSize 1000000000
 
 # Docker konteyner kontrolü
 echo -e "${BEYAZ}Docker konteyneri kontrol ediliyor...${RESET}"
-sleep 10  # Konteyner başlaması için bekle
-CONTAINER_ID=$(docker ps -q --filter ancestor=aztecprotocol/aztec:latest)
+sleep 5  # Konteyner başlaması için bekle
+CONTAINER_ID=$(docker ps -q -f name=aztec-node)
 if [ -n "$CONTAINER_ID" ]; then
     echo -e "${YESIL}✅ Aztec Docker konteyneri başarıyla başlatıldı: ${CONTAINER_ID}${RESET}"
+    
+    # Konteyner durumunu göster
+    docker ps | grep aztec-node
 else
-    echo -e "${SARI}⚠️ Docker konteyneri hemen başlatılamadı. Log dosyalarını kontrol edin.${RESET}"
+    echo -e "${KIRMIZI}❌ Docker konteyneri başlatılamadı.${RESET}"
+    echo -e "${BEYAZ}Hata mesajı:${RESET}"
+    docker logs aztec-node
+    
+    # Fallback: Daha basit bir yapılandırma ile tekrar dene
+    echo -e "${SARI}⚠️ Daha basit bir yapılandırma ile tekrar deneniyor...${RESET}"
+    docker run -d \
+      --name aztec-node-simple \
+      -p 8080:8080 \
+      -p 40400:40400/tcp \
+      -p 40400:40400/udp \
+      -p 40500:40500 \
+      -v /root/aztec-data:/data \
+      aztecprotocol/aztec:latest \
+      node /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node
+    
+    sleep 5
+    if [ -n "$(docker ps -q -f name=aztec-node-simple)" ]; then
+        echo -e "${YESIL}✅ Basit yapılandırma ile Aztec node başlatıldı.${RESET}"
+    else
+        echo -e "${KIRMIZI}❌ Basit yapılandırma ile de başlatılamadı. Log'ları kontrol edin:${RESET}"
+        docker logs aztec-node-simple
+    fi
 fi
 
 # Kurulumu tamamla
@@ -301,30 +323,12 @@ echo -e "${YESIL}✅ KriptoKurdu Aztec Node kurulum işlemi tamamlandı!${RESET}
 # Yardımcı Bilgiler
 echo -e "${MOR}══════════ Önemli Komutlar ══════════${RESET}"
 echo -e "${BEYAZ}📊 Log Kontrolü:${RESET}"
-echo -e "${YESIL}sudo docker logs -f \$(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)${RESET}\n"
+echo -e "${YESIL}docker logs -f aztec-node${RESET}\n"
 
-echo -e "${BEYAZ}🔍 İspatlanmış Son Blok Numarası:${RESET}"
-echo -e "${YESIL}curl -s -X POST -H 'Content-Type: application/json' \\
--d '{\"jsonrpc\":\"2.0\",\"method\":\"node_getL2Tips\",\"params\":[],\"id\":67}' \\
-http://localhost:8080 | jq -r \".result.proven.number\"${RESET}\n"
-
-echo -e "${BEYAZ}🔄 Senkronizasyon Kanıtı (BLOCK_NUMBER yerine blok numarası yazın):${RESET}"
-echo -e "${YESIL}curl -s -X POST -H 'Content-Type: application/json' \\
--d '{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"BLOCK_NUMBER\",\"BLOCK_NUMBER\"],\"id\":67}' \\
-http://localhost:8080 | jq -r \".result\"${RESET}\n"
-
-echo -e "${BEYAZ}📝 Doğrulayıcı Kayıt Komutu:${RESET}"
-echo -e "${YESIL}aztec add-l1-validator \\
-  --l1-rpc-urls \"$RPC_URL\" \\
-  --private-key \"$PRIVATE_KEY\" \\
-  --attester \"0x$(echo $PRIVATE_KEY | cut -c 3- | tr -d '\n' | xxd -r -p | openssl ec -inform DER -noout -text 2>/dev/null | tail -n +3 | head -n -1 | tr -d ' \n\r:' | sed 's/^04//' | tail -c 40)\" \\
-  --proposer-eoa \"0x$(echo $PRIVATE_KEY | cut -c 3- | tr -d '\n' | xxd -r -p | openssl ec -inform DER -noout -text 2>/dev/null | tail -n +3 | head -n -1 | tr -d ' \n\r:' | sed 's/^04//' | tail -c 40)\" \\
-  --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \\
-  --l1-chain-id 11155111${RESET}\n"
-
-echo -e "${BEYAZ}🌐 Screen Oturumu Erişimi:${RESET}"
-echo -e "${YESIL}screen -r aztec${RESET} (Node çıktısını görmek için)\n"
-echo -e "${YESIL}screen -d aztec${RESET} (Çıktıyı görüntülerken ayrılmak için CTRL+A ve ardından D tuşuna basın)\n"
+echo -e "${BEYAZ}Docker Konteyner Yönetimi:${RESET}"
+echo -e "${YESIL}docker stop aztec-node${RESET} (Node'u durdurmak için)"
+echo -e "${YESIL}docker start aztec-node${RESET} (Node'u başlatmak için)"
+echo -e "${YESIL}docker restart aztec-node${RESET} (Node'u yeniden başlatmak için)\n"
 
 echo -e "${BEYAZ}🌐 Topluluk:${RESET}"
 echo -e "${YESIL}Discord: https://discord.gg/aztec${RESET}"
@@ -334,15 +338,13 @@ echo -e "${SARI}Not: Node'un tamamen senkronize olması yaklaşık 10-20 dakika 
 echo -e "${SARI}Doğrulayıcı kaydı sırasında 'ValidatorQuotaFilledUntil' hatası alırsanız,${RESET}"
 echo -e "${SARI}bu günlük kota dolduğu anlamına gelir. 01:00 UTC'den sonra tekrar deneyin.${RESET}\n"
 
-echo -e "${BEYAZ}Node'u durdurmak için:${RESET} ${YESIL}aztec stop${RESET}"
-echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver --sequencer${RESET}\n"
-
 echo -e "${TURKUAZ}═══════════ Sorun Giderme ═══════════${RESET}"
 echo -e "${BEYAZ}Eğer node başlatılmadıysa veya hata aldıysanız:${RESET}"
-echo -e "${YESIL}1. Aztec'i durdurun:${RESET} aztec stop"
-echo -e "${YESIL}2. Mevcut verileri temizleyin:${RESET} rm -rf ~/.aztec/alpha-testnet/data/archiver"
-echo -e "${YESIL}3. En son sürüme güncelleyin:${RESET} aztec-up alpha-testnet"
-echo -e "${YESIL}4. Daha basit bir yapılandırma ile deneyin:${RESET} aztec start --network alpha-testnet --node --archiver\n"
+echo -e "${YESIL}1. Docker konteynerini durdurun:${RESET} docker stop aztec-node"
+echo -e "${YESIL}2. Docker konteynerini kaldırın:${RESET} docker rm aztec-node"
+echo -e "${YESIL}3. Mevcut verileri temizleyin:${RESET} rm -rf /root/aztec-data/*"
+echo -e "${YESIL}4. Daha basit bir yapılandırma ile deneyin:${RESET}"
+echo -e "${YESIL}   docker run -d --name aztec-node -p 8080:8080 -p 40400:40400 -p 40500:40500 aztecprotocol/aztec:latest node /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node${RESET}\n"
 
 echo -e "${TURKUAZ}╔═══════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${TURKUAZ}║               ${BEYAZ}KriptoKurdu!${TURKUAZ}              ║${RESET}"
