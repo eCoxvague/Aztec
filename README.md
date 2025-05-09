@@ -188,21 +188,11 @@ Senkronizasyon sorunları genellikle ağ bağlantısı veya donanım kısıtlama
 
 KriptoKurdu ekibi olarak sorularınızı yanıtlamaktan ve size yardımcı olmaktan memnuniyet duyarız:
 
-- **Discord:** [KriptoKurdu Discord](https://discord.gg/kriptokurdu)
-- **Telegram:** [KriptoKurdu Telegram](https://t.me/kriptokurdu)
-- **Twitter:** [@KriptoKurdu](https://twitter.com/KriptoKurdu)
-- **Website:** [kriptokurdu.com](https://kriptokurdu.com)
-
-## 📄 Lisans
-
-Bu rehber ve betikler MIT Lisansı altında dağıtılmaktadır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
+- **Telegram:** [KriptoKurdu Telegram](https://t.me/kriptokurdugrup)
+- **Twitter:** [@KriptoKurdu](https://twitter.com/KriptoKurduu)
 
 ---
 
 <p align="center">
-  <strong>KriptoKurdu Topluluğu tarafından ❤️ ile hazırlanmıştır.</strong>
-</p>
-
-<p align="center">
-  <img src="https://i.ibb.co/ZfCZrSQ/kriptokurdu-logo.png" alt="KriptoKurdu Logo" width="100"/>
+  <strong>KriptoKurdu tarafından ❤️ ile hazırlanmıştır.</strong>
 </p>
