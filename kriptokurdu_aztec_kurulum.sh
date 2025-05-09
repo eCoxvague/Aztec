@@ -2,90 +2,89 @@
 
 clear
 
-# Banner
 cat << "EOF"
 
 
 ╔════════════════════════════════════════════════════════════╗                                                 
-              A Z T E C   N O D E
-                by RetardMeG
+                    K R İ P T O K U R D U 
+                      A Z T E C   N O D E
 
-📡 Twitter:  https://x.com/Jaishiva0302
-💬 Telegram: https://t.me/vampsairdrop
+             Twitter:  https://x.com/kriptokurduu
+             Telegram: https://t.me/vampsairdrop
 ╚════════════════════════════════════════════════════════════╝
 
 EOF
 
-sleep 7
+sleep 5
 
-# Run as root
+# Root olarak çalıştırılıyor mu kontrol et
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Please run this script as root using: sudo su"
+  echo "❌ Lütfen bu betiği root olarak çalıştırın: sudo su"
   exit 1
 fi
 
-# Go to home directory
+# Ana dizine geç
 cd
 
-# System update and upgrade
-echo "📦 Updating system..."
+# Sistem güncellemesi
+echo "📦 Sistem paketleri güncelleniyor..."
 apt-get update && apt-get upgrade -y
 
-# Install dependencies
-echo "📚 Installing dependencies..."
+# Gerekli bağımlılıkların kurulumu
+echo "📚 Gerekli bağımlılıklar yükleniyor..."
 apt install curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev -y
 
-# Install Docker
-echo "🐳 Installing Docker..."
+# Docker kurulumu
+echo "🐳 Docker kuruluyor..."
 apt install docker.io -y
 
-# Install Aztec CLI
-echo "🚀 Installing Aztec CLI..."
+# Aztec CLI kurulumu
+echo "🚀 Aztec CLI kuruluyor..."
 bash -i <(curl -s https://install.aztec.network)
 
-# Update PATH
+# PATH güncellemesi
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
-# Initialize Aztec CLI
+# Aztec CLI başlatılıyor
 aztec
 aztec-up alpha-testnet
 
-# Get public IP
+# IP adresi alınıyor
 public_ip=$(curl -s ipinfo.io/ip)
-echo "🌐 Detected public IP: $public_ip"
-echo "⚠️  Please save this IP before proceeding."
-read -p "Have you saved it? (y/n): " saved
+echo "🌐 Tespit edilen IP adresiniz: $public_ip"
+echo "⚠️  Devam etmeden önce bu IP adresini kaydettiğinizden emin olun."
+read -p "Kaydettiniz mi? (y/n): " saved
 if [ "$saved" != "y" ]; then
-  echo "❗ Save the IP and rerun the script."
+  echo "❗ Lütfen IP adresini kaydedin ve scripti tekrar çalıştırın."
   exit 1
 fi
 
-# Setup firewall
-echo "🧱 Configuring firewall..."
+# Güvenlik duvarı yapılandırması
+echo "🧱 Güvenlik duvarı ayarlanıyor..."
 ufw allow ssh
 ufw allow 40400
 ufw allow 40500
 ufw allow 8080
 ufw --force enable
 
-# Prompt for wallet
-read -p "🔐 Enter your EVM wallet address: " COINBASE
+# Cüzdan adresi soruluyor
+read -p "🔐 EVM cüzdan adresinizi girin: " COINBASE
 
-# Export environment variables
+# Ortam değişkenleri ayarlanıyor
 export DATA_DIRECTORY=/root/aztec-data/
 export COINBASE=$COINBASE
 export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
-# Prompt for RPC and validator info
-read -p "🌍 Enter your Ethereum Sepolia RPC URL(get it from https://dashboard.alchemy.com/apps/): " RPC_URL
-read -p "🛰️  Enter your Ethereum Beacon Consensus RPC URL(get it from https://console.chainstack.com/user/login): " CONSENSUS_URL
-read -p "📡 Enter your saved public IP address: " LOCAL_IP
-read -p "🔑 Enter your validator private key: " PRIVATE_KEY
+# RPC ve validator bilgileri alınıyor
+read -p "🌍 Ethereum Sepolia RPC URL’nizi girin (https://dashboard.alchemy.com/apps üzerinden alınabilir): " RPC_URL
+read -p "🛰️  Ethereum Beacon Consensus RPC URL’nizi girin (https://console.chainstack.com/user/login üzerinden alınabilir): " CONSENSUS_URL
+read -p "📡 Kaydettiğiniz genel IP adresinizi tekrar girin: " LOCAL_IP
+read -p "🔑 Validator private key’inizi girin: " PRIVATE_KEY
 
-# Start the Aztec node
-echo "🚦 Starting Aztec node..."
+# Aztec node başlatılıyor
+echo "🚦 Aztec node başlatılıyor..."
 aztec start \
   --network alpha-testnet \
   --l1-rpc-urls "$RPC_URL" \
