@@ -14,13 +14,13 @@ SIFIR='\033[0m'  # Renk sıfırlama
 # Başlık
 cat << "BANNER"
 
-$(echo -e "${MAVI}***********************************************${SIFIR}")
-$(echo -e "${MAVI}*         K R İ P T O K U R D U  N O D E       *${SIFIR}")
-$(echo -e "${MAVI}*        Hazırlayan: KriptoKurdu              *${SIFIR}")
-$(echo -e "${MAVI}*---------------------------------------------*${SIFIR}")
+$(echo -e "${MAVI}**********************************************************${SIFIR}")
+$(echo -e "${MAVI}*         K R İ P T O K U R D U  A Z T E C N O D E       *${SIFIR}")
+$(echo -e "${MAVI}*               Hazırlayan: KriptoKurdu                  *${SIFIR}")
+$(echo -e "${MAVI}*--------------------------------------------------------*${SIFIR}")
 $(echo -e "${MAVI}*   🦄 Twitter : https://twitter.com/kriptokurduu${SIFIR}")
 $(echo -e "${MAVI}*   🦉 Telegram: https://t.me/kriptokurdugrup${SIFIR}")
-$(echo -e "${MAVI}***********************************************${SIFIR}")
+$(echo -e "${MAVI}**********************************************************${SIFIR}")
 
 BANNER
 
