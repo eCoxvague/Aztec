@@ -1,7 +1,7 @@
 # 🐺 KriptoKurdu'nun Aztec Sequencer Node Kurulum Rehberi
 
 <p align="center">
-  <img src="[https://i.ibb.co/ZfCZrSQ/kriptokurdu-logo.png](https://ibb.co/TqwZkSB8)" alt="KriptoKurdu Logo" width="200"/>
+  <img src="https://ibb.co/TqwZkSB8" alt="KriptoKurdu Logo" width="200"/>
 </p>
 
 <p align="center">
