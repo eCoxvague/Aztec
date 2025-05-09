@@ -75,7 +75,7 @@ screen -S aztec
 ### 5. Otomatik Kurulum Betiğini Çalıştırma
 KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
 ```
-curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
+curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
 ```
 
 Kurulum betiği otomatik olarak:
@@ -152,7 +152,7 @@ Aztec protokolü güncellendiğinde node'unuzu güncellemek için aşağıdaki a
 
 ### 1. Güncelleme Betiğini İndirin ve Çalıştırın
 ```
-curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_guncelleme.sh && chmod +x kriptokurdu_aztec_guncelleme.sh && ./kriptokurdu_aztec_guncelleme.sh
+curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_guncelleme.sh && chmod +x kriptokurdu_aztec_guncelleme.sh && ./kriptokurdu_aztec_guncelleme.sh
 ```
 
 Güncelleme betiği:
@@ -167,6 +167,10 @@ Güncelleme tamamlandıktan sonra, node'un düzgün çalıştığından emin olm
 sudo docker logs -f $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
 ```
 
+# Kaldırma için
+```
+curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kaldirma.sh && chmod +x kriptokurdu_aztec_kaldirma.sh && ./kriptokurdu_aztec_kaldirma.sh
+```
 ## ❓ Sık Sorulan Sorular
 
 ### Node için ne kadar ödül alacağım?
