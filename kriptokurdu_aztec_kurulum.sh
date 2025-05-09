@@ -1,16 +1,9 @@
 #!/bin/bash
-
-# ------------------------------------------------------------------
-# Aztec Alpha-Testnet Node Kurulum Script
-# Tüm adımlar eksiksiz, JSON parse, Docker, Beacon RPC ve PATH hatalarından
-dolayı oluşan sorunlar giderilmiştir.
-# ------------------------------------------------------------------
-
+clear
 set -e
 export PATH="/bin:/usr/bin:$HOME/.aztec/bin:$PATH"
-clear
 
-# Renk tanımları
+# Renk Tanımları
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -26,21 +19,22 @@ echo -e "${BLUE}🌐 Telegram: ${YELLOW}https://t.me/kriptokurdugrup${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 sleep 3
 
-# 1) Root kontrolü
+# 1) Root Kontrolü
 if [[ "$EUID" -ne 0 ]]; then
   echo -e "${RED}❌ Lütfen script'i root olarak çalıştırın (sudo)!${NC}"
   exit 1
 fi
 
-# 2) Çalışma dizini -> home
+# 2) Home'a Dönüş
 echo -e "${CYAN}📂 Ana dizine geçiliyor...${NC}"
 cd ~
 
-# 3) Geçici dizin oluştur
+# 3) Geçici Dizin Oluştur
+echo -e "${CYAN}📁 Geçici dizin hazırlanıyor...${NC}"
 TMPDIR=$(mktemp -d)
 cd "$TMPDIR"
 
-# 4) bootnode.json oluşturuluyor
+# 4) bootnode.json Oluşturma
 cat > bootnode.json << 'EOF'
 {
   "sequence": {
@@ -60,12 +54,13 @@ cat > bootnode.json << 'EOF'
 }
 EOF
 
-# 5) Sistem güncelleme & temel paketler
-echo -e "${CYAN}🔧 Sistem güncelleniyor ve paketler yükleniyor...${NC}"
+# 5) Sistem Güncelleme ve Paket Kurulum
+echo -e "${CYAN}🔧 Sistem güncelleniyor ve temel paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
-apt-get install -y curl jq nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates software-properties-common lsb-release
+apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
+  nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates
 
-# 6) Eski Docker varsa temizle
+# 6) Eski Docker Temizleme
 echo -e "${YELLOW}🧹 Eski Docker kalıntıları temizleniyor...${NC}"
 if command -v docker &>/dev/null; then
   CONTAINERS=$(docker ps -aq)
@@ -79,14 +74,36 @@ if command -v docker &>/dev/null; then
   echo -e "${GREEN}✅ Eski Docker kaldırıldı.${NC}"
 fi
 
-# 7) Docker kur
-echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
+# 7) Docker Kurulumu
+echo -e "${CYAN}🐳 Docker yükleniyor...${NC}"
+apt-get update
 apt-get install -y docker.io
 systemctl enable docker
-systemctl start docker
+systemctl start docker || true
 
-# 8) DNS ve hosts ayarları
-echo -e "${CYAN}🌐 DNS ve hosts yapılandırılıyor...${NC}"
+# 7b) Docker Daemon Konfigürasyonu
+echo -e "${CYAN}⚙️ Docker daemon yapılandırması yapılıyor...${NC}"
+cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {"max-size": "100m", "max-file": "3"}
+}
+EOF
+mkdir -p /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/override.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+EOF
+systemctl daemon-reload
+systemctl restart containerd
+docker info >/dev/null 2>&1
+systemctl restart docker
+
+# 8) DNS ve Hosts Ayarları
+echo -e "${CYAN}🌐 DNS ve hosts dosyaları güncelleniyor...${NC}"
 cat > /etc/resolv.conf <<EOF
 nameserver 1.1.1.1
 nameserver 8.8.8.8
@@ -97,29 +114,30 @@ cat >> /etc/hosts <<EOF
 172.67.211.145 bootnode-alpha-1.aztec.network
 EOF
 
-# 9) Nginx ile statik sunucu
-echo -e "${CYAN}🌍 Statik bootnode sunucusu kuruluyor...${NC}"
+# 9) Nginx Statik Sunucu
+echo -e "${CYAN}🌍 Nginx ile statik sunucu ayarlanıyor...${NC}"
 mkdir -p /var/www/html/alpha-testnet/
 cp bootnode.json /var/www/html/alpha-testnet/bootnodes.json
-systemctl enable nginx && systemctl restart nginx
+touch /var/www/html/alpha-testnet/index.html
+systemctl restart nginx
 
-# 10) UFW yapılandırması
-echo -e "${CYAN}🧱 Güvenlik duvarı ayarlanıyor...${NC}"
+# 10) UFW Güvenlik Duvarı
+echo -e "${CYAN}🧱 Güvenlik duvarı kuralları ekleniyor...${NC}"
 ufw allow ssh
 ufw allow 40400/tcp
 ufw allow 40400/udp
 ufw allow 8080
 ufw --force enable
 
-# 11) Aztec CLI kurulumu
+# 11) Aztec CLI Kurulumu
 echo -e "${CYAN}🚀 Aztec CLI kuruluyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
-# PATH güncellemesi
+# PATH Güncellemesi
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
-# 12) CLI wrapper shebang düzelt
-echo -e "${CYAN}🔧 CLI script shebang'ları düzeltiliyor...${NC}"
+# 12) CLI Wrapper Shebang Düzeltme
+echo -e "${CYAN}🔧 CLI script shebang'ları güncelleniyor...${NC}"
 for f in "$HOME/.aztec/bin/"*; do
   if [[ -f "$f" ]]; then
     sed -i '1s|.*|#!/bin/bash|' "$f"
@@ -127,17 +145,20 @@ for f in "$HOME/.aztec/bin/"*; do
   fi
 done
 
-# 13) Aztec araçlarını güncelle
+# 13) Araçları Güncelleme
+echo -e "${CYAN}🔄 Aztec araçları güncelleniyor (alpha-testnet)...${NC}"
 aztec-up alpha-testnet
 
-# 14) Kullanıcı girdileri
+# 14) Kullanıcı Girdileri
+echo -e "${CYAN}🔐 Kullanıcı bilgileriniz alınıyor...${NC}"
 read -p "🔐 EVM cüzdan adresinizi girin: " COINBASE
 read -p "🌍 Sepolia RPC URL (ETHEREUM_HOSTS): " RPC_URL
 read -p "🔑 Validator private key: " PRIVATE_KEY
 
-# 15) Genel IP seçimi
+# 15) Genel IP
+echo -e "${CYAN}🌐 Genel IP algılanıyor...${NC}"
 PUBLIC_IP=$(curl -s https://api.ipify.org)
-echo "Algılanan public IP: $PUBLIC_IP"
+echo -e "${GREEN}Algılanan IP: $PUBLIC_IP${NC}"
 read -p "Bu IP'yi kullanmak ister misiniz? (y/n): " USE_IP
 if [[ "$USE_IP" == "y" ]]; then
   LOCAL_IP=$PUBLIC_IP
@@ -145,8 +166,8 @@ else
   read -p "📡 IP adresinizi girin: " LOCAL_IP
 fi
 
-# 16) Beacon RPC otomatik test
-echo -e "${CYAN}🛰️ Beacon consensus RPC çalışıyor mu test ediliyor...${NC}"
+# 16) Beacon Consensus RPC Test
+echo -e "${CYAN}🛰️ Beacon consensus RPC testi yapılıyor...${NC}"
 for url in "https://rpc.drpc.org/eth/sepolia/beacon" "https://lodestar-sepolia.chainsafe.io"; do
   echo -n "Testing $url... "
   if curl -sf "$url" -o /dev/null; then
@@ -161,17 +182,17 @@ if [[ -z "$CONSENSUS_URL" ]]; then
   read -p "🛰️ Çalışan Beacon RPC URL girin: " CONSENSUS_URL
 fi
 
-# 17) Data/config hazırlığı
+# 17) Data/Config Hazırlığı
 echo -e "${CYAN}📂 Data/config dizini oluşturuluyor...${NC}"
 DATA_DIR="$HOME/aztec-data"
 mkdir -p "$DATA_DIR/config"
 curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
 
-# 18) Çalışma dizinini /root yap
-echo -e "${CYAN}📂 Çalışma dizini home'a dönülüyor...${NC}"
+# 18) Home'a Dön
+echo -e "${CYAN}📂 Çalışma dizini home'a getiriliyor...${NC}"
 cd ~
 
-# 19) Node başlatma
+# 19) Node Başlatma
 echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
 aztec start --network alpha-testnet \
   --l1-rpc-urls "$RPC_URL" \
@@ -182,11 +203,11 @@ aztec start --network alpha-testnet \
   --p2p.maxTxPoolSize 1000000000 \
   --archiver --node --sequencer
 
-# 20) Log takibi
+# 20) Log Takibi
 echo -e "${CYAN}📊 Logları izlemek için: aztec logs --follow${NC}"
-echo -e "${CYAN}📋 Alternatif Docker log komutu: docker logs -f aztec-node${NC}"
+echo -e "${CYAN}📋 Alternatif: docker logs -f aztec-node${NC}"
 
-# 21) Cleanup
+# 21) Temizlik
 echo -e "${CYAN}🧹 Geçici dosyalar temizleniyor...${NC}"
 rm -rf "$TMPDIR"
 
