@@ -26,7 +26,7 @@ $(echo -e "${MAVI}*         K R İ P T O K U R D U  N O D E       *${SIFIR}")
 $(echo -e "${MAVI}*        Hazırlayan: KriptoKurdu               *${SIFIR}")
 $(echo -e "${MAVI}*---------------------------------------------*${SIFIR}")
 $(echo -e "${MAVI}*   🦄 Twitter : https://twitter.com/kriptokurduu${SIFIR}")
-$(echo -e "${MAVI}*   🦉 Telegram: https://t.me/kriptokurdugrup ${SIFIR}")
+$(echo -e "${MAVI}*   🦉 Telegram: https://t.me/kriptokurdugrup${SIFIR}")
 $(echo -e "${MAVI}***********************************************${SIFIR}")
 
 BANNER
@@ -59,23 +59,30 @@ systemctl enable --now docker
 echo -e "${SARI}🚀 Aztec CLI kuruluyor...${SIFIR}"
 bash -i <(curl -s https://install.aztec.network)
 
-# PATH güncellemesi
-echo -e "${YESIL}✅ PATH dizini güncelleniyor...${SIFIR}"
+# Yüklenen CLI ikililerini PATH'e al
+AZTEC_BIN="$HOME/.aztec/bin"
+export PATH="$AZTEC_BIN:$PATH"
+
+# PATH ayarını kalıcı kıl
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+
+# Yeni PATH ile shell'i yeniden yükle
 source ~/.bashrc
 
-# Aztec CLI başlatma
-echo -e "${SARI}🔧 Aztec CLI başlatılıyor...${SIFIR}"
-aztec
-aztec-up alpha-testnet
+# Aztec CLI kontrol
+echo -e "${YESIL}✅ aztec versiyon: $(aztec --version)${SIFIR}"
+
+# Aztec ağını başlat
+echo -e "${SARI}🔧 Aztec ağı başlatılıyor...${SIFOR}"
+aztec up alpha-testnet
 
 # Genel IP adresi tespiti
 IP=$(curl -s ipinfo.io/ip)
 echo -e "${MOR}🌎 Bulunan IP: ${IP}${SIFIR}"
-echo -e "${SARI}Bu IP’yi kaydetmeyi unutmayın!${SIFIR}"
+echo -e "${SARI}Bu IP’yi kaydetmeyi unutmayın!${SIFOR}"
 read -p "Kaydettiniz mi? (e/h): " cevap
 if [ "$cevap" != "e" ]; then
-  echo -e "${KIRMIZI}Lütfen IP’yi kaydederek tekrar çalıştırın.${SIFIR}"
+  echo -e "${KIRMIZI}Lütfen IP’yi kaydederek tekrar çalıştırın.${SIFOR}"
   exit 1
 fi
 
@@ -88,7 +95,7 @@ ufw allow 8080
 ufw --force enable
 
 # Cüzdan adresi girme
-echo -en "${MOR}🔒 EVM cüzdan adresinizi girin: ${SIFIR}"
+echo -en "${MOR}🔒 EVM cüzdan adresinizi girin: ${SIFOR}"
 read CUZDAN
 
 # Ortam değişkenleri export
@@ -99,16 +106,16 @@ export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
 # RPC ve validator bilgileri
-echo -en "${MOR}📡 Sepolia RPC URL (Alchemy vb.): ${SIFIR}"
+echo -en "${MOR}📡 Sepolia RPC URL (Alchemy vb.): ${SIFOR}"
 read RPC
 
-echo -en "${MOR}🚀 Beacon Konsensüs RPC URL: ${SIFIR}"
+echo -en "${MOR}🚀 Beacon Konsensüs RPC URL: ${SIFOR}"
 read CONS
 
-echo -en "${MOR}🏠 Yerel IP adresi: ${SIFIR}"
+echo -en "${MOR}🏠 Yerel IP adresi: ${SIFOR}"
 read YEREL_IP
 
-echo -en "${MOR}🔑 Validator özel anahtar: ${SIFIR}"
+echo -en "${MOR}🔑 Validator özel anahtar: ${SIFOR}"
 read VK
 
 # Aztec düğümünü başlatma
