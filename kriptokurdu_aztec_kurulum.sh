@@ -83,15 +83,29 @@ else
     echo -e "${YESIL}✅ Docker zaten kurulu. Sürüm: $DOCKER_VERSION${RESET}"
 fi
 
-# Güvenlik duvarı yapılandırması
+# UFW kurulumunu kontrol et ve yükle
 echo -e "\n${TURKUAZ}══════════ Güvenlik Duvarı Yapılandırılıyor ══════════${RESET}"
+if ! command -v ufw &> /dev/null; then
+    echo -e "${BEYAZ}UFW (Uncomplicated Firewall) kuruluyor...${RESET}"
+    sudo apt-get install -y ufw
+    echo -e "${YESIL}✅ UFW başarıyla kuruldu!${RESET}"
+else
+    echo -e "${YESIL}✅ UFW zaten kurulu.${RESET}"
+fi
+
+# Güvenlik duvarı yapılandırması
 echo -e "${BEYAZ}Gerekli portlar açılıyor...${RESET}"
-sudo ufw allow ssh
-sudo ufw allow 40400
-sudo ufw allow 40500
-sudo ufw allow 8080
-sudo ufw --force enable
-echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
+if command -v ufw &> /dev/null; then
+    sudo ufw allow ssh
+    sudo ufw allow 40400
+    sudo ufw allow 40500
+    sudo ufw allow 8080
+    sudo ufw --force enable
+    echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
+else
+    echo -e "${SARI}⚠️ UFW yüklenemedi, güvenlik duvarı yapılandırılmadı.${RESET}"
+    echo -e "${SARI}⚠️ Kurulum devam edecek, ancak portları manuel olarak açmanız gerekebilir.${RESET}"
+fi
 
 echo -e "\n${TURKUAZ}══════════ Aztec Kurulumu ══════════${RESET}"
 echo -e "${BEYAZ}Aztec CLI kuruluyor (resmi Aztec kurulum betiği)...${RESET}"
@@ -106,10 +120,11 @@ source ~/.bashrc
 # Kurulum başarılı mı kontrol et
 if ! command -v aztec &> /dev/null; then
     echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız oldu. Lütfen manuel olarak kontrol edin.${RESET}"
-    exit 1
+    # Kurulum başarısız olsa bile devam et, kullanıcıya bilgi ver
+    echo -e "${SARI}Kurulum işlemi devam edecek, ancak Aztec CLI komutları çalışmayabilir.${RESET}"
+else
+    echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
 fi
-
-echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
 
 # Kullanıcıdan Ethereum RPC URL'ini al (opsiyonel)
 echo -e "\n${BEYAZ}Ethereum Sepolia RPC URL'nizi girin (boş bırakabilirsiniz):${RESET}"
@@ -120,16 +135,29 @@ echo -e "\n${TURKUAZ}══════════ Aztec Node Başlatılıyor �
 echo -e "${BEYAZ}Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
 echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse endişelenmeyin, bu normaldir.${RESET}"
 
-# Aztec'i başlat (RPC URL girildiyse kullan)
-if [ -z "$RPC_URL" ]; then
-    aztec start --network alpha-testnet --node --archiver
+# PATH'i güncelle (bazı sistemlerde gerekli olabilir)
+export PATH="$HOME/.aztec/bin:$PATH"
+
+# Aztec başlatma komutunu çalıştır
+if command -v aztec &> /dev/null; then
+    # Aztec'i başlat (RPC URL girildiyse kullan)
+    if [ -z "$RPC_URL" ]; then
+        aztec start --network alpha-testnet --node --archiver || {
+            echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
+        }
+    else
+        aztec start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver || {
+            echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
+        }
+    fi
 else
-    aztec start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver
+    echo -e "${KIRMIZI}❌ Aztec komutu bulunamadı. Kurulum tamamlanamadı.${RESET}"
+    echo -e "${SARI}Lütfen manuel olarak 'bash -i <(curl -s https://install.aztec.network)' komutunu çalıştırın ve kurulumu tamamlayın.${RESET}"
 fi
 
 # Kurulumu tamamla
 echo -e "\n${TURKUAZ}══════════ Kurulum Tamamlandı ══════════${RESET}"
-echo -e "${YESIL}✅ KriptoKurdu Aztec Node kurulumu başarıyla tamamlandı!${RESET}\n"
+echo -e "${YESIL}✅ KriptoKurdu Aztec Node kurulum işlemi tamamlandı!${RESET}\n"
 
 # IP adresini al
 PUBLIC_IP=$(curl -s ipinfo.io/ip)
@@ -167,6 +195,9 @@ echo -e "${YESIL}Twitter: https://twitter.com/KriptoKurdu${RESET}\n"
 echo -e "${SARI}Not: Node'un tamamen senkronize olması yaklaşık 10-20 dakika sürebilir.${RESET}"
 echo -e "${SARI}Doğrulayıcı kaydı sırasında 'ValidatorQuotaFilledUntil' hatası alırsanız,${RESET}"
 echo -e "${SARI}bu günlük kota dolduğu anlamına gelir. 01:00 UTC'den sonra tekrar deneyin.${RESET}\n"
+
+echo -e "${BEYAZ}Node'u durdurmak için:${RESET} ${YESIL}aztec stop${RESET}"
+echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver${RESET}\n"
 
 echo -e "${TURKUAZ}╔═══════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${TURKUAZ}║       ${BEYAZ}KriptoKurdu Ekibine Teşekkürler!${TURKUAZ}                      ║${RESET}"
