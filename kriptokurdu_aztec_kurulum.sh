@@ -51,9 +51,9 @@ fi
 # RAM Kontrolü
 TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
 echo -ne "${BEYAZ}Toplam RAM: ${RESET}"
-if [ "$TOTAL_MEM" -lt 8000 ]; then
-    echo -e "${KIRMIZI}$TOTAL_MEM MB (Önerilen: 8+ GB)${RESET}"
-    echo -e "${SARI}⚠️  Uyarı: Stabil çalışma için en az 8GB RAM önerilir${RESET}"
+if [ "$TOTAL_MEM" -lt 16000 ]; then
+    echo -e "${KIRMIZI}$TOTAL_MEM MB (Önerilen: 16+ GB)${RESET}"
+    echo -e "${SARI}⚠️  Uyarı: Stabil çalışma için en az 16GB RAM önerilir${RESET}"
 else
     echo -e "${YESIL}$TOTAL_MEM MB ✓${RESET}"
 fi
@@ -72,6 +72,29 @@ fi
 echo -e "\n${BEYAZ}Sistem gereksinimleri karşılanmıyor olsa bile kuruluma devam edilsin mi?${RESET}"
 echo -e "${BEYAZ}Devam etmek için ENTER tuşuna basın, iptal etmek için CTRL+C tuşuna basın...${RESET}"
 read -r
+
+# Mevcut Aztec kurulumunu temizle (eğer varsa)
+echo -e "\n${TURKUAZ}══════════ Mevcut Kurulumu Temizleme ══════════${RESET}"
+
+# Aztec'i durdur (eğer çalışıyorsa)
+if command -v aztec &> /dev/null; then
+    echo -e "${BEYAZ}Çalışan Aztec servisi durdurulmaya çalışılıyor...${RESET}"
+    aztec stop &>/dev/null || true
+    echo -e "${YESIL}✅ Aztec servisi durduruldu (varsa)${RESET}"
+fi
+
+# Docker konteynerlerini temizle
+if command -v docker &> /dev/null; then
+    echo -e "${BEYAZ}Aztec Docker konteynerleri temizleniyor...${RESET}"
+    docker rm -f $(docker ps -a -q --filter ancestor=aztecprotocol/aztec:latest) &>/dev/null || true
+    echo -e "${YESIL}✅ Docker konteynerleri temizlendi${RESET}"
+fi
+
+# Veri dizinlerini temizle
+echo -e "${BEYAZ}Eski Aztec verileri temizleniyor...${RESET}"
+rm -rf ~/.aztec/alpha-testnet/data/ &>/dev/null || true
+rm -rf /root/aztec-data/ &>/dev/null || true
+echo -e "${YESIL}✅ Eski veri dizinleri temizlendi${RESET}"
 
 echo -e "\n${TURKUAZ}══════════ Sistem Güncelleniyor ══════════${RESET}"
 echo -e "${BEYAZ}Sistem paketleri güncelleniyor...${RESET}"
@@ -92,6 +115,11 @@ else
     echo -e "${YESIL}✅ Docker zaten kurulu. Sürüm: $DOCKER_VERSION${RESET}"
 fi
 
+# Docker soket izinlerini düzelt
+echo -e "${BEYAZ}Docker soket izinleri düzeltiliyor...${RESET}"
+chmod 666 /var/run/docker.sock
+echo -e "${YESIL}✅ Docker soket izinleri düzeltildi${RESET}"
+
 # UFW kurulumu ve yapılandırması
 echo -e "\n${TURKUAZ}══════════ Güvenlik Duvarı Yapılandırılıyor ══════════${RESET}"
 if ! command -v ufw &> /dev/null; then
@@ -104,9 +132,11 @@ fi
 
 echo -e "${BEYAZ}Gerekli portlar açılıyor...${RESET}"
 ufw allow ssh
-ufw allow 40400
-ufw allow 40500
-ufw allow 8080
+ufw allow 40400/tcp
+ufw allow 40400/udp
+ufw allow 40500/tcp
+ufw allow 40500/udp
+ufw allow 8080/tcp
 ufw --force enable
 echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
 
@@ -121,8 +151,12 @@ echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
+# Testnet sürümünü yükle
+echo -e "${BEYAZ}Alpha testnet sürümünü yüklüyorum...${RESET}"
+aztec-up alpha-testnet
+
 # IP adresini al
-PUBLIC_IP=$(curl -s ipinfo.io/ip)
+PUBLIC_IP=$(curl -s api.ipify.org)
 echo -e "\n${BEYAZ}🌐 Sunucu IP Adresi: ${YESIL}$PUBLIC_IP${RESET}"
 echo -e "${SARI}⚠️  Lütfen bu IP adresini not alın, validator kayıt işleminde gerekecektir.${RESET}"
 echo -e "${BEYAZ}IP adresinizi kaydettiniz mi? (e/h): ${RESET}"
@@ -135,10 +169,25 @@ fi
 # Veri dizini oluştur
 mkdir -p /root/aztec-data/
 
+# Özel anahtar ve cüzdan bilgileri için güvenlik uyarısı
+echo -e "\n${TURKUAZ}══════════ Güvenlik Uyarısı ══════════${RESET}"
+echo -e "${KIRMIZI}⚠️ ÖNEMLİ GÜVENLİK UYARISI ⚠️${RESET}"
+echo -e "${SARI}Validator işlemleri için YENİ ve SADECE bu amaçla kullanılacak bir Ethereum cüzdanı oluşturmanız önerilir.${RESET}"
+echo -e "${SARI}Ana cüzdanınızın özel anahtarını ASLA kullanmayın!${RESET}"
+echo -e "${BEYAZ}Yeni bir cüzdan oluşturmak için MetaMask veya başka bir Ethereum cüzdanı kullanabilirsiniz.${RESET}"
+echo -e "${BEYAZ}MetaMask > Hesap Oluştur > Hesap Ayarları > Özel Anahtarı Dışa Aktar${RESET}\n"
+
 # Çevre değişkenleri için cüzdan adresi al
 echo -e "\n${TURKUAZ}══════════ Cüzdan Bilgileri ══════════${RESET}"
-echo -e "${BEYAZ}🔐 Ethereum cüzdan adresinizi girin: ${RESET}"
+echo -e "${BEYAZ}🔐 Blok ödüllerini alacak Ethereum cüzdan adresinizi girin (coinbase): ${RESET}"
 read -r COINBASE
+
+# Cüzdan adresi formatını kontrol et
+if [[ ! "$COINBASE" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    echo -e "${SARI}⚠️ Girdiğiniz adres '0x' ile başlayan 42 karakterlik bir Ethereum adresi değil.${RESET}"
+    echo -e "${BEYAZ}Devam etmek için ENTER tuşuna basın, iptal etmek için CTRL+C tuşuna basın...${RESET}"
+    read -r
+fi
 
 # Çevre değişkenlerini ayarla
 export DATA_DIRECTORY=/root/aztec-data/
@@ -146,37 +195,104 @@ export COINBASE=$COINBASE
 export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
+# RPC Önerileri
+echo -e "\n${TURKUAZ}══════════ RPC Önerileri ══════════${RESET}"
+echo -e "${BEYAZ}Sepolia RPC URL için öneriler:${RESET}"
+echo -e "${YESIL}- https://rpc.sepolia.org${RESET}"
+echo -e "${YESIL}- https://ethereum-sepolia.publicnode.com${RESET}"
+echo -e "${YESIL}- Alchemy: https://eth-sepolia.g.alchemy.com/v2/YOUR-API-KEY${RESET}"
+echo -e "${YESIL}- Infura: https://sepolia.infura.io/v3/YOUR-API-KEY${RESET}"
+
+echo -e "${BEYAZ}Consensus RPC URL için öneriler:${RESET}"
+echo -e "${YESIL}- Quicknode: https://billowing-broken-river.ethereum-sepolia.quiknode.pro/YOUR-API-KEY/${RESET}"
+echo -e "${YESIL}- dRPC: https://lb.drpc.org/ogrpc?network=sepolia&dkey=YOUR-API-KEY${RESET}"
+echo -e "${YESIL}- https://ethereum-sepolia-beacon-chain.publicnode.com${RESET}"
+
 # RPC ve diğer bilgileri al
 echo -e "\n${TURKUAZ}══════════ RPC Bilgileri ══════════${RESET}"
-echo -e "${BEYAZ}🌍 Ethereum Sepolia RPC URL'nizi girin:${RESET}"
+echo -e "${BEYAZ}🌍 Ethereum Sepolia RPC URL'nizi girin (veya varsayılan için boş bırakın):${RESET}"
 echo -e "${SARI}(Buradan alabilirsiniz: https://dashboard.alchemy.com/apps/)${RESET}"
 read -r RPC_URL
+if [ -z "$RPC_URL" ]; then
+    RPC_URL="https://rpc.sepolia.org"
+    echo -e "${SARI}Varsayılan RPC URL kullanılıyor: $RPC_URL${RESET}"
+fi
 
-echo -e "${BEYAZ}🛰️ Ethereum Beacon Consensus RPC URL'nizi girin:${RESET}"
+echo -e "${BEYAZ}🛰️ Ethereum Beacon Consensus RPC URL'nizi girin (veya varsayılan için boş bırakın):${RESET}"
 echo -e "${SARI}(Buradan alabilirsiniz: https://console.chainstack.com/user/login)${RESET}"
 read -r CONSENSUS_URL
+if [ -z "$CONSENSUS_URL" ]; then
+    CONSENSUS_URL="https://ethereum-sepolia-beacon-chain.publicnode.com"
+    echo -e "${SARI}Varsayılan Consensus URL kullanılıyor: $CONSENSUS_URL${RESET}"
+fi
 
-echo -e "${BEYAZ}📡 Az önce kaydettiğiniz IP adresinizi girin:${RESET}"
+echo -e "${BEYAZ}📡 Az önce kaydettiğiniz IP adresinizi girin (veya otomatik tespit için boş bırakın):${RESET}"
 read -r LOCAL_IP
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP=$PUBLIC_IP
+    echo -e "${SARI}Otomatik tespit edilen IP kullanılıyor: $LOCAL_IP${RESET}"
+fi
 
-echo -e "${BEYAZ}🔑 Validator özel anahtarınızı girin:${RESET}"
+echo -e "${BEYAZ}🔑 Validator özel anahtarınızı girin (0x ile başlayan):${RESET}"
 read -r PRIVATE_KEY
+
+# Özel anahtar formatını kontrol et
+if [[ -z "$PRIVATE_KEY" ]]; then
+    echo -e "${KIRMIZI}❌ Özel anahtar boş olamaz!${RESET}"
+    exit 1
+fi
+
+# RPC URL'leri doğrulama
+if [[ ! "$RPC_URL" =~ ^https?:// ]]; then
+    echo -e "${KIRMIZI}❌ RPC URL'si geçerli bir format değil. 'http://' veya 'https://' ile başlamalı.${RESET}"
+    exit 1
+fi
+
+if [[ ! "$CONSENSUS_URL" =~ ^https?:// ]]; then
+    echo -e "${KIRMIZI}❌ Consensus URL'si geçerli bir format değil. 'http://' veya 'https://' ile başlamalı.${RESET}"
+    exit 1
+fi
 
 echo -e "\n${TURKUAZ}══════════ Aztec Node Başlatılıyor ══════════${RESET}"
 echo -e "${BEYAZ}Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
 echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse endişelenmeyin, bu normaldir.${RESET}"
 
+# Screen oturumu oluştur
+echo -e "${BEYAZ}Screen oturumu oluşturuluyor...${RESET}"
+screen -dmS aztec bash -c "
 # Aztec node'u tam parametrelerle başlat
-aztec start \
+if ! aztec start \
   --network alpha-testnet \
-  --l1-rpc-urls "$RPC_URL" \
-  --l1-consensus-host-urls "$CONSENSUS_URL" \
-  --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-  --p2p.p2pIp "$LOCAL_IP" \
+  --l1-rpc-urls \"$RPC_URL\" \
+  --l1-consensus-host-urls \"$CONSENSUS_URL\" \
+  --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" \
+  --sequencer.coinbase \"$COINBASE\" \
+  --p2p.p2pIp \"$LOCAL_IP\" \
   --p2p.maxTxPoolSize 1000000000 \
   --archiver \
   --node \
-  --sequencer
+  --sequencer; then
+    
+    echo -e \"${SARI}⚠️ Tam parametreli başlatma başarısız oldu, daha basit bir yapılandırma ile deneniyor...${RESET}\"
+    
+    # Önceki verileri temizleme
+    rm -rf ~/.aztec/alpha-testnet/data/archiver
+    
+    # Daha basit yapılandırma ile başlatmayı dene
+    aztec start --network alpha-testnet --node --archiver
+fi
+"
+echo -e "${YESIL}✅ Node başlatıldı ve arka planda çalışıyor (Screen oturumu: aztec)${RESET}"
+
+# Docker konteyner kontrolü
+echo -e "${BEYAZ}Docker konteyneri kontrol ediliyor...${RESET}"
+sleep 10  # Konteyner başlaması için bekle
+CONTAINER_ID=$(docker ps -q --filter ancestor=aztecprotocol/aztec:latest)
+if [ -n "$CONTAINER_ID" ]; then
+    echo -e "${YESIL}✅ Aztec Docker konteyneri başarıyla başlatıldı: ${CONTAINER_ID}${RESET}"
+else
+    echo -e "${SARI}⚠️ Docker konteyneri hemen başlatılamadı. Log dosyalarını kontrol edin.${RESET}"
+fi
 
 # Kurulumu tamamla
 echo -e "\n${TURKUAZ}══════════ Kurulum Tamamlandı ══════════${RESET}"
@@ -199,12 +315,16 @@ http://localhost:8080 | jq -r \".result\"${RESET}\n"
 
 echo -e "${BEYAZ}📝 Doğrulayıcı Kayıt Komutu:${RESET}"
 echo -e "${YESIL}aztec add-l1-validator \\
-  --l1-rpc-urls SEPOLIA-RPC-URL \\
-  --private-key CÜZDAN-ÖZEL-ANAHTARINIZ \\
-  --attester CÜZDAN-ADRESİNİZ \\
-  --proposer-eoa CÜZDAN-ADRESİNİZ \\
+  --l1-rpc-urls \"$RPC_URL\" \\
+  --private-key \"$PRIVATE_KEY\" \\
+  --attester \"0x$(echo $PRIVATE_KEY | cut -c 3- | tr -d '\n' | xxd -r -p | openssl ec -inform DER -noout -text 2>/dev/null | tail -n +3 | head -n -1 | tr -d ' \n\r:' | sed 's/^04//' | tail -c 40)\" \\
+  --proposer-eoa \"0x$(echo $PRIVATE_KEY | cut -c 3- | tr -d '\n' | xxd -r -p | openssl ec -inform DER -noout -text 2>/dev/null | tail -n +3 | head -n -1 | tr -d ' \n\r:' | sed 's/^04//' | tail -c 40)\" \\
   --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \\
   --l1-chain-id 11155111${RESET}\n"
+
+echo -e "${BEYAZ}🌐 Screen Oturumu Erişimi:${RESET}"
+echo -e "${YESIL}screen -r aztec${RESET} (Node çıktısını görmek için)\n"
+echo -e "${YESIL}screen -d aztec${RESET} (Çıktıyı görüntülerken ayrılmak için CTRL+A ve ardından D tuşuna basın)\n"
 
 echo -e "${BEYAZ}🌐 Topluluk:${RESET}"
 echo -e "${YESIL}Discord: https://discord.gg/aztec${RESET}"
@@ -216,6 +336,13 @@ echo -e "${SARI}bu günlük kota dolduğu anlamına gelir. 01:00 UTC'den sonra t
 
 echo -e "${BEYAZ}Node'u durdurmak için:${RESET} ${YESIL}aztec stop${RESET}"
 echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver --sequencer${RESET}\n"
+
+echo -e "${TURKUAZ}═══════════ Sorun Giderme ═══════════${RESET}"
+echo -e "${BEYAZ}Eğer node başlatılmadıysa veya hata aldıysanız:${RESET}"
+echo -e "${YESIL}1. Aztec'i durdurun:${RESET} aztec stop"
+echo -e "${YESIL}2. Mevcut verileri temizleyin:${RESET} rm -rf ~/.aztec/alpha-testnet/data/archiver"
+echo -e "${YESIL}3. En son sürüme güncelleyin:${RESET} aztec-up alpha-testnet"
+echo -e "${YESIL}4. Daha basit bir yapılandırma ile deneyin:${RESET} aztec start --network alpha-testnet --node --archiver\n"
 
 echo -e "${TURKUAZ}╔═══════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${TURKUAZ}║               ${BEYAZ}KriptoKurdu!${TURKUAZ}              ║${RESET}"
