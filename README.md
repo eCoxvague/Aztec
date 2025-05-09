@@ -72,6 +72,11 @@ Kurulum işleminin arka planda devam etmesi için bir screen oturumu oluşturun:
 screen -S aztec
 ```
 
+Eğer screen yüklü değilse;
+```
+sudo apt install screen
+```
+
 ### 5. Otomatik Kurulum Betiğini Çalıştırma
 KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
 ```
