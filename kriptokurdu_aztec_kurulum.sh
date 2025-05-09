@@ -29,12 +29,12 @@ fi
 echo -e "${CYAN}📂 Ana dizine geçiliyor...${NC}"
 cd ~
 
-# 3) Geçici Dizin Oluştur
+# 3) Geçici Dizini Oluştur
 echo -e "${CYAN}📁 Geçici dizin hazırlanıyor...${NC}"
 TMPDIR=$(mktemp -d)
 cd "$TMPDIR"
 
-# 4) bootnode.json Oluşturma
+# 4) bootnode.json Oluştur
 echo -e "${CYAN}📄 bootnode.json oluşturuluyor...${NC}"
 cat > bootnode.json << 'EOF'
 {
@@ -55,33 +55,30 @@ cat > bootnode.json << 'EOF'
 }
 EOF
 
-# 5) Sistem Güncelleme & Temel Paketler
-echo -e "${CYAN}🔧 Sistem güncelleniyor ve temel paketler yükleniyor...${NC}"
+# 5) Sistem Güncelleme & Paket Kurulum
+echo -e "${CYAN}🔧 Sistem güncelleniyor ve paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
-apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
-  nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates
+apt-get install -y curl jq lsb-release gnupg2 software-properties-common nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates
 
 # 6) Mevcut Docker Paketlerini Kaldır (varsa)
-echo -e "${YELLOW}🧹 Eski Docker paketleri kaldırılıyor...${NC}"
+echo -e "${YELLOW}🧹 Mevcut Docker paketleri kaldırılıyor...${NC}"
 apt-get purge -y docker docker-engine docker.io containerd runc docker-ce docker-ce-cli containerd.io || true
 rm -rf /var/lib/docker /var/lib/containerd /etc/docker
 
-echo -e "${GREEN}✅ Eski Docker paketleri kaldırıldı.${NC}"
+echo -e "${GREEN}✅ Mevcut Docker paketleri kaldırıldı.${NC}"
 
-# 7) Resmi Docker Repo Kurulumu & Docker CE Kurulumu
-echo -e "${CYAN}🐳 Docker resmi repository kuruluyor...${NC}"
-apt-get update
+# 7) Docker CE Resmi Repo ve Kurulum
+echo -e "${CYAN}🐳 Docker CE resmi repoyu ekliyor...${NC}"
 apt-get install -y apt-transport-https ca-certificates curl gnupg2 lsb-release
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > \
-  /etc/apt/sources.list.d/docker.list
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  > /etc/apt/sources.list.d/docker.list
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
 
-# 7b) Docker Daemon Yapılandırması
-echo -e "${CYAN}⚙️ Docker daemon yapılandırması yapılıyor...${NC}"
+# 7b) Docker Daemon Konfigürasyonu
+echo -e "${CYAN}⚙️ Docker daemon yapılandırılıyor...${NC}"
 mkdir -p /etc/docker
 cat > /etc/docker/daemon.json <<EOF
 {
@@ -102,13 +99,13 @@ echo -e "${CYAN}🚦 Docker servisi başlatılıyor...${NC}"
 systemctl enable docker
 systemctl start docker
 if ! systemctl is-active --quiet docker; then
-  echo -e "${RED}❌ Docker servisi başlatılamadı. journalctl -xeu docker.service ile inceleyin.${NC}"
+  echo -e "${RED}❌ Docker servisi başlatılamadı. Lütfen journalctl -xeu docker.service ile kontrol edin.${NC}"
   exit 1
 fi
 
 echo -e "${GREEN}✅ Docker servisi çalışıyor.${NC}"
 
-# 8) DNS ve Hosts
+# 8) DNS ve Hosts Ayarları
 echo -e "${CYAN}🌐 DNS ve hosts güncelleniyor...${NC}"
 cat > /etc/resolv.conf <<EOF
 nameserver 1.1.1.1
@@ -117,16 +114,16 @@ nameserver 8.8.4.4
 EOF
 cat >> /etc/hosts <<EOF
 104.21.31.61 static.aztec.network
-172.67.211.145 bootnode-alpha-1.aztec.network
+172.67.211.145 bootnode-alpha-testnet.aztec.network
 EOF
 
 # 9) Nginx Statik Sunucu
-echo -e "${CYAN}🌍 Nginx statik bootnode sunucusu ayarlanıyor...${NC}"
+echo -e "${CYAN}🌍 Nginx ile statik bootnode sunucusu kuruluyor...${NC}"
 mkdir -p /var/www/html/alpha-testnet/
 cp bootnode.json /var/www/html/alpha-testnet/bootnodes.json
 systemctl enable nginx && systemctl restart nginx
 
-# 10) UFW Kuralları
+# 10) UFW Güvenlik Duvarı Kuralları
 echo -e "${CYAN}🧱 Güvenlik duvarı kuralları ekleniyor...${NC}"
 ufw allow ssh
 ufw allow 40400/tcp
@@ -141,10 +138,10 @@ bash <(curl -s https://install.aztec.network)
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
-# 12) CLI Shebang Düzeltme
+# 12) CLI Script Shebang Düzeltme
 echo -e "${CYAN}🔧 CLI script shebang'ları düzeltiliyor...${NC}"
 for f in "$HOME/.aztec/bin/"*; do
-  [[ -f "$f" ]] && sed -i '1s|.*|#!/bin/bash|' "$f" && chmod +x "$f"
+  [[ -f "$f" ]] && /bin/sed -i '1s|.*|#!/bin/bash|' "$f" && /bin/chmod +x "$f"
 done
 
 # 13) Aztec Araçları Güncelleme
@@ -152,12 +149,12 @@ echo -e "${CYAN}🔄 Aztec araçları güncelleniyor (alpha-testnet)...${NC}"
 aztec-up alpha-testnet
 
 # 14) Kullanıcı Girdileri
-echo -e "${CYAN}🔐 Kullanıcı bilgileri alınıyor...${NC}"
+echo -e "${CYAN}🔐 Kullanıcı bilgileriniz alınıyor...${NC}"
 read -p "🔐 EVM cüzdan adresinizi girin: " COINBASE
 read -p "🌍 Sepolia RPC URL (ETHEREUM_HOSTS): " RPC_URL
 read -p "🔑 Validator private key: " PRIVATE_KEY
 
-# 15) Genel IP
+# 15) Genel IP Algılama
 echo -e "${CYAN}🌐 Genel IP algılanıyor...${NC}"
 PUBLIC_IP=$(curl -s https://api.ipify.org)
 echo -e "${GREEN}Algılanan IP: $PUBLIC_IP${NC}"
@@ -168,8 +165,8 @@ else
   read -p "📡 IP adresinizi girin: " LOCAL_IP
 fi
 
-# 16) Beacon RPC Test
-echo -e "${CYAN}🛰️ Beacon consensus RPC test ediliyor...${NC}"
+# 16) Beacon Consensus RPC Test
+echo -e "${CYAN}🛰️ Beacon consensus RPC testi yapılıyor...${NC}"
 for url in "https://rpc.drpc.org/eth/sepolia/beacon" "https://lodestar-sepolia.chainsafe.io"; do
   echo -n "Testing $url... "
   if curl -sf "$url" -o /dev/null; then
@@ -184,12 +181,11 @@ if [[ -z "$CONSENSUS_URL" ]]; then
   read -p "🛰️ Çalışan Beacon RPC URL girin: " CONSENSUS_URL
 fi
 
-# 17) Data/config Dizini Oluşturma
+# 17) Data/Config Dizini Oluşturma
 echo -e "${CYAN}📂 Data/config dizini oluşturuluyor...${NC}"
 DATA_DIR="$HOME/aztec-data"
 mkdir -p "$DATA_DIR/config"
-curl -s https://static.aztec.network/config/alpha-testnet.json | \
-  jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
+curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-testnet.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
 
 # 18) Home'a Dön
 echo -e "${CYAN}📂 Home dizinine dönülüyor...${NC}"
