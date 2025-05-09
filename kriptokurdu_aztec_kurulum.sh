@@ -56,43 +56,31 @@ cat > bootnode.json << 'EOF'
 EOF
 
 # 5) Sistem Güncelleme & Temel Paketler
-echo -e "${CYAN}🔧 Sistem güncelleniyor ve paketler yükleniyor...${NC}"
+echo -e "${CYAN}🔧 Sistem güncelleniyor ve temel paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
   nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates
 
-# 6) Eski Docker Paketleri Kaldırma
+# 6) Docker Paketlerini Kaldırma (varsa)
 echo -e "${YELLOW}🧹 Mevcut Docker paketleri kaldırılıyor...${NC}"
-apt-get purge -y docker-ce docker-ce-cli containerd.io runc docker docker-engine docker.io || true
+apt-get purge -y docker docker-engine docker.io containerd runc || true
 rm -rf /var/lib/docker /var/lib/containerd /etc/docker
 
 echo -e "${GREEN}✅ Eski Docker paketleri kaldırıldı (varsa).${NC}"
 
-# 7) Docker Kurulumu
+# 7) Docker Kurulumu & Başlatılması
 echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
 apt-get update
 apt-get install -y docker.io
 systemctl enable docker
 systemctl start docker
+# Docker servisi aktif mi kontrol et
+if ! systemctl is-active --quiet docker; then
+  echo -e "${RED}❌ Docker servisi başlatılamadı. Lütfen journalctl -xeu docker.service ile hataya bakın.${NC}"
+  exit 1
+fi
 
-# 7b) Docker Daemon Konfigürasyonu
-echo -e "${CYAN}⚙️ Docker daemon yapılandırması...${NC}"
-cat > /etc/docker/daemon.json <<EOF
-{
-  "exec-opts": ["native.cgroupdriver=systemd"],
-  "storage-driver": "overlay2",
-  "log-driver": "json-file",
-  "log-opts": {"max-size": "100m", "max-file": "3"}
-}
-EOF
-mkdir -p /etc/systemd/system/docker.service.d
-cat > /etc/systemd/system/docker.service.d/override.conf <<EOF
-[Service]
-ExecStart=
-ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
-EOF
-systemctl daemon-reload
-systemctl restart docker
+echo -e "${GREEN}✅ Docker servisi çalışıyor.${NC}"
 
 # 8) DNS ve Hosts Ayarları
 echo -e "${CYAN}🌐 DNS ve hosts dosyaları güncelleniyor...${NC}"
@@ -123,7 +111,7 @@ ufw --force enable
 # 11) Aztec CLI Kurulumu
 echo -e "${CYAN}🚀 Aztec CLI kuruluyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
-
+# PATH Güncellemesi
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
