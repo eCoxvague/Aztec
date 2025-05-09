@@ -25,16 +25,16 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
-# 2) Home'a Dönüş
+# 2) Ana Dizin
 echo -e "${CYAN}📂 Ana dizine geçiliyor...${NC}"
 cd ~
 
-# 3) Geçici Dizin Oluştur
+# 3) Geçici Dizin Oluşturuluyor
 echo -e "${CYAN}📁 Geçici dizin hazırlanıyor...${NC}"
 TMPDIR=$(mktemp -d)
 cd "$TMPDIR"
 
-# 4) bootnode.json Oluşturma
+# 4) bootnode.json Oluşturuluyor
 echo -e "${CYAN}📄 bootnode.json oluşturuluyor...${NC}"
 cat > bootnode.json << 'EOF'
 {
@@ -55,7 +55,7 @@ cat > bootnode.json << 'EOF'
 }
 EOF
 
-# 5) Sistem Güncelleme & Temel Paketler
+# 5) Sistem Güncelleme ve Temel Paketler
 echo -e "${CYAN}🔧 Sistem güncelleniyor ve temel paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
@@ -63,26 +63,26 @@ apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
 
 # 6) Docker Paketlerini Kaldırma (varsa)
 echo -e "${YELLOW}🧹 Mevcut Docker paketleri kaldırılıyor...${NC}"
-apt-get purge -y docker docker-engine docker.io containerd runc || true
+apt-get purge -y "docker*" containerd runc || true
 rm -rf /var/lib/docker /var/lib/containerd /etc/docker
 
 echo -e "${GREEN}✅ Eski Docker paketleri kaldırıldı (varsa).${NC}"
 
-# 7) Docker Kurulumu & Başlatılması
+# 7) Docker Kur & Başlat
 echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
 apt-get update
 apt-get install -y docker.io
 systemctl enable docker
 systemctl start docker
-# Docker servisi aktif mi kontrol et
+# Docker servisi kontrolü
 if ! systemctl is-active --quiet docker; then
-  echo -e "${RED}❌ Docker servisi başlatılamadı. Lütfen journalctl -xeu docker.service ile hataya bakın.${NC}"
+  echo -e "${RED}❌ Docker servisi başlatılamadı. Lütfen journalctl -xeu docker.service ile kontrol edin.${NC}"
   exit 1
 fi
 
 echo -e "${GREEN}✅ Docker servisi çalışıyor.${NC}"
 
-# 8) DNS ve Hosts Ayarları
+# 8) DNS ve Hosts Güncelleme
 echo -e "${CYAN}🌐 DNS ve hosts dosyaları güncelleniyor...${NC}"
 cat > /etc/resolv.conf <<EOF
 nameserver 1.1.1.1
@@ -111,7 +111,7 @@ ufw --force enable
 # 11) Aztec CLI Kurulumu
 echo -e "${CYAN}🚀 Aztec CLI kuruluyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
-# PATH Güncellemesi
+# PATH Güncelleme
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
@@ -162,8 +162,7 @@ fi
 echo -e "${CYAN}📂 Data/config dizini oluşturuluyor...${NC}"
 DATA_DIR="$HOME/aztec-data"
 mkdir -p "$DATA_DIR/config"
-curl -s https://static.aztec.network/config/alpha-testnet.json | \
-  jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
+curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
 
 # 18) Home'a Dön
 echo -e "${CYAN}📂 Çalışma dizini home'a getiriliyor...${NC}"
