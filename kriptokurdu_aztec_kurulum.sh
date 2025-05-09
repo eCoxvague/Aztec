@@ -26,11 +26,14 @@ BANNER
 
 sleep 2
 
-# Root kontrolü
+# Eğer root değilsek, sudo ile yeniden çalıştır
 if [ "$EUID" -ne 0 ]; then
-  echo -e "${KIRMIZI}Hata: Root olarak çalıştırın (sudo su)${SIFIR}"
-  exit 1
+  echo -e "${KIRMIZI}Yönetici (root) hakları gerekiyor, sudo ile yeniden başlatılıyor...${SIFIR}"
+  exec sudo bash "$0" "$@"
 fi
+
+# Ekranı temizle
+clear
 
 # Ana dizine geç
 cd ~
