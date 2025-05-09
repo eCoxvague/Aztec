@@ -10,6 +10,8 @@ TURKUAZ='\033[0;36m'
 BEYAZ='\033[1;37m'
 RESET='\033[0m'
 
+clear
+
 # KriptoKurdu Banner
 echo -e "${TURKUAZ}"
 echo "╔═══════════════════════════════════════════════════════════╗"
@@ -67,7 +69,7 @@ echo -e "${BEYAZ}Sistem paketleri güncelleniyor...${RESET}"
 sudo apt update && sudo apt upgrade -y
 
 echo -e "${BEYAZ}Gerekli temel paketler yükleniyor...${RESET}"
-sudo apt install -y curl wget git build-essential jq pkg-config libssl-dev bc screen
+sudo apt install -y curl wget git build-essential jq pkg-config libssl-dev bc screen libleveldb-dev
 
 # Docker Kontrolü ve Kurulumu
 if ! command -v docker &> /dev/null; then
@@ -81,51 +83,58 @@ else
     echo -e "${YESIL}✅ Docker zaten kurulu. Sürüm: $DOCKER_VERSION${RESET}"
 fi
 
-# Node.js Kontrolü ve Kurulumu
-if ! command -v node &> /dev/null; then
-    echo -e "${BEYAZ}Node.js kuruluyor...${RESET}"
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-    nvm install 18
-    nvm use 18
-    nvm alias default 18
-    echo -e "${YESIL}✅ Node.js başarıyla kuruldu!${RESET}"
-else
-    NODE_VERSION=$(node -v)
-    echo -e "${YESIL}✅ Node.js zaten kurulu. Sürüm: $NODE_VERSION${RESET}"
-fi
-
-# Yeni bir terminal oturumu açılırsa NVM'in çalışması için profile ekle
-if [ -d "$HOME/.nvm" ]; then
-    if ! grep -q "NVM_DIR" ~/.bashrc; then
-        echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
-        echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
-        echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
-    fi
-fi
-
-# Mevcut terminal oturumu için NVM'i etkinleştir
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+# Güvenlik duvarı yapılandırması
+echo -e "\n${TURKUAZ}══════════ Güvenlik Duvarı Yapılandırılıyor ══════════${RESET}"
+echo -e "${BEYAZ}Gerekli portlar açılıyor...${RESET}"
+sudo ufw allow ssh
+sudo ufw allow 40400
+sudo ufw allow 40500
+sudo ufw allow 8080
+sudo ufw --force enable
+echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
 
 echo -e "\n${TURKUAZ}══════════ Aztec Kurulumu ══════════${RESET}"
-echo -e "${BEYAZ}Aztec CLI Kuruluyor...${RESET}"
-npm install -g @aztec/cli@latest
+echo -e "${BEYAZ}Aztec CLI kuruluyor (resmi Aztec kurulum betiği)...${RESET}"
 
-# Aztec dizini oluştur
-mkdir -p ~/.aztec/alpha-testnet
+# Aztec'in resmi kurulum betiğini kullan
+bash -i <(curl -s https://install.aztec.network)
+
+# PATH güncellemesini bash profiline ekle
+echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Kurulum başarılı mı kontrol et
+if ! command -v aztec &> /dev/null; then
+    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız oldu. Lütfen manuel olarak kontrol edin.${RESET}"
+    exit 1
+fi
+
+echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
+
+# Kullanıcıdan Ethereum RPC URL'ini al (opsiyonel)
+echo -e "\n${BEYAZ}Ethereum Sepolia RPC URL'nizi girin (boş bırakabilirsiniz):${RESET}"
+echo -e "${SARI}Örnek: https://sepolia.infura.io/v3/YOUR-KEY${RESET}"
+read -r RPC_URL
 
 echo -e "\n${TURKUAZ}══════════ Aztec Node Başlatılıyor ══════════${RESET}"
 echo -e "${BEYAZ}Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
 echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse endişelenmeyin, bu normaldir.${RESET}"
-aztec-up alpha-testnet
+
+# Aztec'i başlat (RPC URL girildiyse kullan)
+if [ -z "$RPC_URL" ]; then
+    aztec start --network alpha-testnet --node --archiver
+else
+    aztec start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver
+fi
 
 # Kurulumu tamamla
 echo -e "\n${TURKUAZ}══════════ Kurulum Tamamlandı ══════════${RESET}"
 echo -e "${YESIL}✅ KriptoKurdu Aztec Node kurulumu başarıyla tamamlandı!${RESET}\n"
+
+# IP adresini al
+PUBLIC_IP=$(curl -s ipinfo.io/ip)
+echo -e "${BEYAZ}🌐 Sunucu IP Adresi: ${YESIL}$PUBLIC_IP${RESET}"
+echo -e "${SARI}⚠️  Lütfen bu IP adresini not alın, validator kayıt işleminde gerekecektir.${RESET}\n"
 
 # Yardımcı Bilgiler
 echo -e "${MOR}══════════ Önemli Komutlar ══════════${RESET}"
