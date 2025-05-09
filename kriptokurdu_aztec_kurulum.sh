@@ -67,6 +67,18 @@ if ! systemctl is-active --quiet docker; then
 fi
 echo "✅ Docker servisi çalışıyor."
 
+# ──────────────────────────────────────────────────────────
+# Docker tmp dizini fix
+echo "🛠️  Docker tmp dizini hazırlanıyor..."
+mkdir -p /var/lib/docker/tmp
+chown root:docker /var/lib/docker/tmp
+chmod 711 /var/lib/docker/tmp
+# ──────────────────────────────────────────────────────────
+
+# Aztec imajını çek
+echo "📥 Aztec imajı çekiliyor..."
+docker pull aztecprotocol/aztec:latest
+
 # DNS & hosts
 echo "🌐 DNS ve hosts dosyaları güncelleniyor..."
 cat > /etc/resolv.conf <<EOF
@@ -147,13 +159,13 @@ curl -s https://static.aztec.network/config/alpha-testnet.json | \
   jq '.p2pBootstrapNodes = ["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' \
   > "$DATA_DIR/config/alpha-testnet.json"
 
-# Start Aztec node via CLI
 echo "🚦 Starting Aztec node..."
 aztec start \
   --network alpha-testnet \
   --l1-rpc-urls "$RPC_URL" \
   --l1-consensus-host-urls "$CONSENSUS_URL" \
   --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+  --sequencer.coinbase "$COINBASE" \          ← bu satırı ekle
   --p2p.p2pIp "$PUBLIC_IP" \
   --p2p.maxTxPoolSize 1000000000 \
   --archiver \
