@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Ekranı temizle
-clear
-
 # Renk tanımları
 KIRMIZI='\033[0;31m'
 YESIL='\033[0;32m'
@@ -11,29 +8,30 @@ MOR='\033[0;35m'
 MAVI='\033[0;34m'
 SIFIR='\033[0m'  # Renk sıfırlama
 
+# —— Otomatik root yükseltme ——
+if [[ $EUID -ne 0 ]]; then
+  echo -e "${KIRMIZI}Root yetkisi gerekiyor, sudo ile yeniden başlatılıyor...${SIFIR}"
+  exec sudo bash "$0" "$@"
+fi
+# ————————————————————————
+
+# Ekranı temizle
+clear
+
 # Başlık
 cat << "BANNER"
 
-$(echo -e "${KIRMIZI}***********************************************${KIRMIZI}")
-$(echo -e "${KIRMIZI}*         K R İ P T O K U R D U  N O D E       *${KIRMIZI}")
-$(echo -e "${KIRMIZI}*        Hazırlayan: KriptoKurdu              *${KIRMIZI}")
-$(echo -e "${KIRMIZI}*---------------------------------------------*${KIRMIZI}")
-$(echo -e "${KIRMIZI}*   🦄 Twitter : https://twitter.com/kriptokurduu${KIRMIZI}")
-$(echo -e "${KIRMIZI}*   🦉 Telegram: https://t.me/kriptokurdugrup${KIRMIZI}")
-$(echo -e "${KIRMIZI}***********************************************${KIRMIZI}")
+$(echo -e "${MAVI}***********************************************${SIFIR}")
+$(echo -e "${MAVI}*         K R İ P T O K U R D U  N O D E       *${SIFIR}")
+$(echo -e "${MAVI}*        Hazırlayan: KriptoKurdu               *${SIFIR}")
+$(echo -e "${MAVI}*---------------------------------------------*${SIFIR}")
+$(echo -e "${MAVI}*   🦄 Twitter : https://twitter.com/kriptokurduu${SIFIR}")
+$(echo -e "${MAVI}*   🦉 Telegram: https://t.me/kriptokurdugrup ${SIFIR}")
+$(echo -e "${MAVI}***********************************************${SIFIR}")
 
 BANNER
 
 sleep 2
-
-# Eğer root değilsek, sudo ile yeniden çalıştır
-if [ "$EUID" -ne 0 ]; then
-  echo -e "${KIRMIZI}Yönetici (root) hakları gerekiyor, sudo ile yeniden başlatılıyor...${SIFIR}"
-  exec sudo bash "$0" "$@"
-fi
-
-# Ekranı temizle
-clear
 
 # Ana dizine geç
 cd ~
@@ -46,15 +44,16 @@ apt-get update && apt-get upgrade -y
 echo -e "${SARI}📚 Gerekli paketler yükleniyor...${SIFIR}"
 apt install -y curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
 
-# Docker kurulumundan önce çakışan paketleri temizleyelim
-echo -e "${SARI}🧹 Mevcut containerd paketleri kaldırılıyor...${SIFOR}"
+# Mevcut çakışan paketleri temizle
+echo -e "${SARI}🧹 Çakışan containerd paketleri kaldırılıyor...${SIFIR}"
 apt-get remove --purge -y containerd containerd.io
 apt-get update
 apt-get -f install
 
-# Sonra Docker’ı yükleyin
-echo -e "${SARI}🐳 Docker kuruluyor...${SIFOR}"
-apt-get install -y docker.io
+# Docker kurulumu
+echo -e "${SARI}🐳 Docker kuruluyor...${SIFIR}"
+apt install -y docker.io
+systemctl enable --now docker
 
 # Aztec CLI yükleme
 echo -e "${SARI}🚀 Aztec CLI kuruluyor...${SIFIR}"
