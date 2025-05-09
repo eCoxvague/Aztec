@@ -61,8 +61,26 @@ cat > bootnode.json << 'EOL'
 EOL
 
 # Sistem güncelleme ve temel paketler
+echo -e "${CYAN}🔧 Sistem güncelleniyor ve gerekli paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
-apt-get install -y curl jq docker.io nginx tmux htop ufw dnsutils net-tools jq
+apt-get install -y curl jq nginx tmux htop ufw dnsutils net-tools software-properties-common lsb-release apt-transport-https ca-certificates curl
+
+# Docker temizliği (varsa eski sürüm)
+echo -e "${YELLOW}🧹 Eski Docker kurulumu temizleniyor (varsa)...${NC}"
+if command -v docker &> /dev/null; then
+  docker stop \$(docker ps -a -q) 2>/dev/null || true
+  docker rm \$(docker ps -a -q) 2>/dev/null || true
+  docker system prune -af --volumes
+  apt-get purge -y docker-ce docker-ce-cli containerd.io docker docker-engine docker.io runc
+  rm -rf /var/lib/docker /var/lib/containerd /etc/docker
+  echo -e "${GREEN}✅ Eski Docker kaldırıldı.${NC}"
+fi
+
+# Docker kurulumu
+echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
+apt-get install -y docker.io
+systemctl enable docker
+systemctl start docker
 
 # DNS ve hosts yapılandırması
 cat > /etc/resolv.conf <<EOF
@@ -81,13 +99,18 @@ cp bootnode.json /var/www/html/alpha-testnet/bootnodes.json
 systemctl enable nginx && systemctl restart nginx
 
 # UFW yapılandırması
-ufw allow ssh && ufw allow 40400/tcp && ufw allow 40400/udp && ufw --force enable
+echo -e "${CYAN}🧱 Güvenlik duvarı ayarlanıyor...${NC}"
+ufw allow ssh
+ufw allow 40400/tcp
+ufw allow 40400/udp
+ufw allow 8080
+ufw --force enable
 
 # Aztec CLI kurulumu ve PATH güncellemesi
 echo -e "${CYAN}🚀 Aztec CLI kuruluyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
-export PATH="$HOME/.aztec/bin:$PATH"
-echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/.aztec/bin:\$PATH"
+echo 'export PATH="$HOME/.aztec/bin:\$PATH"' >> ~/.bashrc
 
 # Araçları güncelle
 aztec-up alpha-testnet
@@ -99,10 +122,10 @@ read -p "🔑 Validator özel anahtarınızı girin: " PRIVATE_KEY
 
 # Genel IP algılama
 PUBLIC_IP=$(curl -s https://api.ipify.org)
-echo "Algılanan IP: $PUBLIC_IP"
+echo "Algılanan IP: \$PUBLIC_IP"
 read -p "Bu IP'yi kullanmak ister misiniz? (e/h): " use_ip
-if [ "$use_ip" = "e" ]; then
-  LOCAL_IP=$PUBLIC_IP
+if [ "\$use_ip" = "e" ]; then
+  LOCAL_IP=\$PUBLIC_IP
 else
   read -p "📡 IP adresinizi girin: " LOCAL_IP
 fi
@@ -110,25 +133,28 @@ fi
 # Beacon consensus RPC otomatik test
 echo -e "${CYAN}🛰️ Beacon consensus RPC test ediliyor...${NC}"
 for url in "https://rpc.drpc.org/eth/sepolia/beacon" "https://lodestar-sepolia.chainsafe.io"; do
-  echo -n "Testing $url... "
-  if curl -sf "$url" -o /dev/null; then
-    CONSENSUS_URL=$url
+  echo -n "Testing \$url... "
+  if curl -sf "\$url" -o /dev/null; then
+    CONSENSUS_URL=\$url
     echo "OK"
     break
   else
     echo "FAIL"
   fi
 done
-if [ -z "$CONSENSUS_URL" ]; then
+if [ -z "\$CONSENSUS_URL" ]; then
   read -p "🛰️ Çalışan Beacon RPC URL'sini girin: " CONSENSUS_URL
 fi
 
 # Data/config hazırlığı
 DATA_DIR="$HOME/aztec-data"
-mkdir -p "$DATA_DIR/config"
+mkdir -p "\$DATA_DIR/config"
 
 # Resmi config indir ve p2pBootstrapNodes ekle
-curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
+curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "\$DATA_DIR/config/alpha-testnet.json"
+
+# Node'u başlatmadan önce home dizinine dön
+cd ~
 
 # Node'u başlat
 echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
@@ -144,7 +170,7 @@ aztec start --network alpha-testnet \
 echo -e "${CYAN}📊 Logları izlemek için:${NC} aztec logs --follow"
 echo -e "${CYAN}📋 Alternatif Docker log komutu:${NC} docker logs -f aztec-node"
 
-# Temizlik
+# Cleanup
 cd ~ && rm -rf "$tmpdir"
 
 echo -e "${GREEN}✅ Kurulum tamamlandı!${NC}"
