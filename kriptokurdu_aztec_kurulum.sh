@@ -190,7 +190,7 @@ echo -e "${YESIL}aztec add-l1-validator \\
 
 echo -e "${BEYAZ}🌐 Topluluk:${RESET}"
 echo -e "${YESIL}Discord: https://discord.gg/aztec${RESET}"
-echo -e "${YESIL}Twitter: https://twitter.com/KriptoKurdu${RESET}\n"
+echo -e "${YESIL}Twitter: https://twitter.com/KriptoKurduu${RESET}\n"
 
 echo -e "${SARI}Not: Node'un tamamen senkronize olması yaklaşık 10-20 dakika sürebilir.${RESET}"
 echo -e "${SARI}Doğrulayıcı kaydı sırasında 'ValidatorQuotaFilledUntil' hatası alırsanız,${RESET}"
@@ -200,7 +200,7 @@ echo -e "${BEYAZ}Node'u durdurmak için:${RESET} ${YESIL}aztec stop${RESET}"
 echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver${RESET}\n"
 
 echo -e "${TURKUAZ}╔═══════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${TURKUAZ}║       ${BEYAZ}KriptoKurdu Ekibine Teşekkürler!${TURKUAZ}                      ║${RESET}"
+echo -e "${TURKUAZ}║               ${BEYAZ}KriptoKurdu!${TURKUAZ}              ║${RESET}"
 echo -e "${TURKUAZ}╚═══════════════════════════════════════════════════════════╝${RESET}"
 
 exit 0
