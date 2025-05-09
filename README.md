@@ -1,4 +1,6 @@
-# 🐺 KriptoKurdu'nun Aztec Sequencer Node Kurulum Rehberi
+<p align="center">
+# KriptoKurdu'nun Aztec Sequencer Node Kurulum Rehberi
+</p>
 
 <p align="center">
   <a href="https://ibb.co/TqwZkSB8"><img src="https://i.ibb.co/x82yD0Sj/Ads-z-tasar-m-19.png" alt="Ads-z-tasar-m-19" border="0"></a>
