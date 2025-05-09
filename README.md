@@ -1,207 +1,117 @@
-<p align="center">
-<strong># KriptoKurdu Aztec Sequencer Node Kurulum Rehberi</strong>
-</p>
+#!/bin/bash
 
-<p align="center">
-  <a href="https://ibb.co/TqwZkSB8"><img src="https://i.ibb.co/x82yD0Sj/Ads-z-tasar-m-19.png" alt="Ads-z-tasar-m-19" border="0"></a>
-</p>
+# Ekranı temizle
+clear
 
----
+# Renk tanımları
+KIRMIZI='\033[0;31m'
+YESIL='\033[0;32m'
+SARI='\033[1;33m'
+MOR='\033[0;35m'
+MAVI='\033[0;34m'
+SIFIR='\033[0m'  # Renk sıfırlama
 
-## 📚 İçindekiler
+# Başlık
+cat << "BANNER"
 
-- [Giriş](#-giriş)
-- [Gereksinimler](#-gereksinimler)
-- [Kurulum Adımları](#-kurulum-adımları)
-- [Node Doğrulama](#-node-doğrulama)
-- [Validator Olarak Kayıt](#-validator-olarak-kayıt)
-- [Güncelleme Talimatları](#-güncelleme-talimatları)
-- [Sık Sorulan Sorular](#-sık-sorulan-sorular)
-- [İletişim](#-iletişim)
+$(echo -e "${MAVI}***********************************************${SIFIR}")
+$(echo -e "${MAVI}*         K R İ P T O K U R D U  N O D E       *${SIFIR}")
+$(echo -e "${MAVI}*        Hazırlayan: KriptoKurdu              *${SIFIR}")
+$(echo -e "${MAVI}*---------------------------------------------*${SIFIR}")
+$(echo -e "${MAVI}*   🦄 Twitter : https://twitter.com/kriptokurduu${SIFIR}")
+$(echo -e "${MAVI}*   🦉 Telegram: https://t.me/kriptokurdugrup${SIFIR}")
+$(echo -e "${MAVI}***********************************************${SIFIR}")
 
----
+BANNER
 
-## 🔍 Giriş
+sleep 2
 
-Aztec, Ethereum üzerinde çalışan gizlilik odaklı bir L2 (Layer 2) çözümüdür. Bu rehber, Aztec ağının altyapısına katkıda bulunmak isteyen kullanıcılar için sequencer node kurulumunu adım adım anlatmaktadır.
+# Root kontrolü
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${KIRMIZI}Hata: Root olarak çalıştırın (sudo su)${SIFIR}"
+  exit 1
+fi
 
-KriptoKurdu ekibi olarak, topluluk üyelerimizin bu teknolojik gelişimlere kolay bir şekilde katılabilmesi için bu rehberi hazırladık. Bu rehberde sunduğumuz kurulum betikleri, süreci otomatikleştirerek herkesin kolayca node çalıştırabilmesini sağlar.
+# Ana dizine geç
+cd ~
 
-## 🛠 Gereksinimler
+# Sistem güncelleme
+echo -e "${SARI}📦 Paketler güncelleniyor ve yükseltiliyor...${SIFIR}"
+apt-get update && apt-get upgrade -y
 
-### Donanım Gereksinimleri
-- **İşlemci:** 8 çekirdek (minimum)
-- **RAM:** 8GB (minimum), 16GB (önerilen)
-- **Depolama:** 100GB SSD (minimum)
-- **İnternet:** Stabil bir internet bağlantısı
+# Gerekli paketlerin kurulumu
+echo -e "${SARI}📚 Gerekli paketler yükleniyor...${SIFIR}"
+apt install -y curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
 
-### Yazılım Gereksinimleri
-- **İşletim Sistemi:** Ubuntu 20.04 LTS veya üzeri
-- **Docker:** En son sürüm
-- **Node.js:** 18.x sürümü
-- **Git:** En son sürüm
+# Docker kurulumu
+echo -e "${SARI}🐳 Docker kuruluyor...${SIFIR}"
+apt install -y docker.io
 
-### Diğer Gereksinimler
-- **ETH Cüzdanı:** Metamask veya başka bir Ethereum cüzdanı
-- **Sepolia Test ETH:** Node doğrulama için test ETH'ye ihtiyacınız olacak
+# Aztec CLI yükleme
+echo -e "${SARI}🚀 Aztec CLI kuruluyor...${SIFIR}"
+bash -i <(curl -s https://install.aztec.network)
 
-## 🔧 Kurulum Adımları
+# PATH güncellemesi
+echo -e "${YESIL}✅ PATH dizini güncelleniyor...${SIFIR}"
+echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
-### 1. VPS Kiralama (Opsiyonel)
-Eğer kendi sunucunuz yoksa, aşağıdaki VPS sağlayıcılardan birini tercih edebilirsiniz:
-- [Contabo](https://contabo.com/en/vps/) - 4.5€/ay'dan başlayan fiyatlarla
-- [Hetzner](https://www.hetzner.com/cloud) - Avrupa ve ABD lokasyonları
-- [Digital Ocean](https://www.digitalocean.com/) - 8GB RAM Droplet önerilir
+# Aztec CLI başlatma
+echo -e "${SARI}🔧 Aztec CLI başlatılıyor...${SIFIR}"
+aztec
+aztec-up alpha-testnet
 
-### 2. Cüzdan Hazırlığı
-- Ethereum ağında yeni bir cüzdan oluşturun veya mevcut bir cüzdanı kullanın
-- Sepolia test ağı için ETH alın:
-  - [Sepolia Faucet](https://sepoliafaucet.com/)
-  - [Infura Faucet](https://www.infura.io/faucet/sepolia)
-- Özel anahtarınızı ve adresinizi güvenli bir yerde saklayın
+# Genel IP adresi tespiti
+IP=$(curl -s ipinfo.io/ip)
+echo -e "${MOR}🌎 Bulunan IP: ${IP}${SIFIR}"
+echo -e "${SARI}Bu IP’yi kaydetmeyi unutmayın!${SIFIR}"
+read -p "Kaydettiniz mi? (e/h): " cevap
+if [ "$cevap" != "e" ]; then
+  echo -e "${KIRMIZI}Lütfen IP’yi kaydederek tekrar çalıştırın.${SIFIR}"
+  exit 1
+fi
 
-### 3. Sunucu Erişimi Sağlama
-SSH ile sunucunuza bağlanın:
-```
-ssh kullanici@sunucu_ip
-```
+# Güvenlik duvarı yapılandırması
+echo -e "${SARI}🛡️ UFW ayarları yapılıyor...${SIFIR}"
+ufw allow ssh
+ufw allow 40400
+ufw allow 40500
+ufw allow 8080
+ufw --force enable
 
-### 4. Screen Oluşturma
-Kurulum işleminin arka planda devam etmesi için bir screen oturumu oluşturun:
-```
-screen -S aztec
-```
+# Cüzdan adresi girme
+echo -en "${MOR}🔒 EVM cüzdan adresinizi girin: ${SIFIR}"
+read CUZDAN
 
-Eğer screen yüklü değilse;
-```
-sudo apt install screen
-```
+# Ortam değişkenleri export
+echo -e "${YESIL}🌟 Ortam değişkenleri ayarlanıyor...${SIFIR}"
+export DATA_DIRECTORY="/root/aztec-data/"
+export COINBASE="$CUZDAN"
+export LOG_LEVEL=debug
+export P2P_MAX_TX_POOL_SIZE=1000000000
 
-### 5. Otomatik Kurulum Betiğini Çalıştırma
-KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
-```
-curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
-```
+# RPC ve validator bilgileri
+echo -en "${MOR}📡 Sepolia RPC URL (Alchemy vb.): ${SIFIR}"
+read RPC
 
-Kurulum betiği otomatik olarak:
-- Sistem gereksinimlerini kontrol eder
-- Gerekli yazılımları yükler
-- Docker ve Node.js kurulumunu yapar
-- Aztec CLI'yı yükler
-- Aztec node'u yapılandırır ve başlatır
+echo -en "${MOR}🚀 Beacon Konsensüs RPC URL: ${SIFIR}"
+read CONS
 
-### 6. Kurulum Tamamlandığında
-- Screen oturumundan çıkmak için `CTRL+A` ardından `D` tuşlarına basın
-- Daha sonra screen oturumuna geri dönmek için:
-```
-screen -r aztec
-```
+echo -en "${MOR}🏠 Yerel IP adresi: ${SIFIR}"
+read YEREL_IP
 
-## 🔄 Node Doğrulama
+echo -en "${MOR}🔑 Validator özel anahtar: ${SIFIR}"
+read VK
 
-Node'unuzun düzgün çalıştığından emin olmak için şu adımları takip edin:
-
-### 1. Logları Kontrol Etme
-```
-sudo docker logs -f $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
-```
-
-### 2. İspatlanmış Son Blok Numarasını Alma
-```
-curl -s -X POST -H 'Content-Type: application/json' \
--d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
-http://localhost:8080 | jq -r ".result.proven.number"
-```
-
-Bu komut bir blok numarası döndürmelidir (örneğin: `20791`). Bu numarayı not edin, bir sonraki adımda kullanacaksınız.
-
-### 3. Senkronizasyon Kanıtı Oluşturma
-Aşağıdaki komutta `BLOK_NUMARASI` bölümünü bir önceki adımda aldığınız blok numarası ile değiştirin:
-
-```
-curl -s -X POST -H 'Content-Type: application/json' \
--d '{"jsonrpc":"2.0","method":"node_getArchiveSiblingPath","params":["BLOK_NUMARASI","BLOK_NUMARASI"],"id":67}' \
-http://localhost:8080 | jq -r ".result"
-```
-
-Komut bir dizi veri döndürecektir, bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
-
-## 🔐 Validator Olarak Kayıt
-
-Node'unuzu validator olarak kaydetmek için aşağıdaki adımları takip edin:
-
-### 1. Cüzdan Bilgilerinizi Hazırlayın
-- `SEPOLIA-RPC-URL`: Sepolia ağı için bir RPC URL (Infura, Alchemy gibi sağlayıcılardan alabilirsiniz)
-- `CÜZDAN-ÖZEL-ANAHTARINIZ`: Cüzdanınızın özel anahtarı (0x ile başlar)
-- `CÜZDAN-ADRESİNİZ`: Cüzdanınızın adresi (0x ile başlar)
-
-### 2. Validator Kayıt Komutunu Çalıştırın
-```
-aztec add-l1-validator \
-  --l1-rpc-urls SEPOLIA-RPC-URL \
-  --private-key CÜZDAN-ÖZEL-ANAHTARINIZ \
-  --attester CÜZDAN-ADRESİNİZ \
-  --proposer-eoa CÜZDAN-ADRESİNİZ \
-  --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \
-  --l1-chain-id 11155111
-```
-
-### 3. Doğrulama Durumunuzu Kontrol Edin
-Discord sunucusuna bağlanın ve `/operator start` komutunu girin. Discord botu size validator rolü verecek ve yönergeler sunacaktır.
-
-**Not:** Eğer "ValidatorQuotaFilledUntil" hatası alırsanız, bu günlük validator kotasının dolduğu anlamına gelir. UTC 01:00'den sonra tekrar deneyin.
-
-## 🔄 Güncelleme Talimatları
-
-Aztec protokolü güncellendiğinde node'unuzu güncellemek için aşağıdaki adımları takip edin:
-
-### 1. Güncelleme Betiğini İndirin ve Çalıştırın
-```
-curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_guncelleme.sh && chmod +x kriptokurdu_aztec_guncelleme.sh && ./kriptokurdu_aztec_guncelleme.sh
-```
-
-Güncelleme betiği:
-- Mevcut node'u durduracak
-- Yazılımı güncelleyecek
-- Eski verileri temizleyecek
-- Node'u yeniden başlatacak
-
-### 2. Güncelleme Sonrası Doğrulama
-Güncelleme tamamlandıktan sonra, node'un düzgün çalıştığından emin olmak için logları kontrol edin:
-```
-sudo docker logs -f $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
-```
-
-# Kaldırma için
-```
-curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kaldirma.sh && chmod +x kriptokurdu_aztec_kaldirma.sh && ./kriptokurdu_aztec_kaldirma.sh
-```
-## ❓ Sık Sorulan Sorular
-
-### Node için ne kadar ödül alacağım?
-Aztec, validator node operatörlerine ağın mainnet lansmanı sonrasında teşvikler sunmayı planlıyor. Ayrıntılar için resmi duyuruları takip edin.
-
-### Node'um çalışmayı durdurdu, ne yapmalıyım?
-İlk olarak logları kontrol edin. Sorun devam ederse, node'u güncelleme betiğimizi kullanarak güncelleyin.
-
-### Doğrulama için neden Sepolia ağını kullanıyoruz?
-Sepolia, Aztec'in test ağı entegrasyonu için seçtiği Ethereum test ağıdır. Mainnet lansmanı öncesinde testler bu ağda yapılacaktır.
-
-### Özel anahtar paylaşmak güvenli mi?
-Özel anahtarınızı sadece kendi VPS'inizde kullanın ve asla başkalarıyla paylaşmayın. Güvenlik için test amaçlı yeni bir cüzdan oluşturmanızı öneririz.
-
-### Node'um senkronize olmuyorsa ne yapmalıyım?
-Senkronizasyon sorunları genellikle ağ bağlantısı veya donanım kısıtlamaları nedeniyle oluşur. Sunucunuzun gereksinimleri karşıladığından emin olun ve internet bağlantınızı kontrol edin.
-
-## 📱 İletişim
-
-KriptoKurdu ekibi olarak sorularınızı yanıtlamaktan ve size yardımcı olmaktan memnuniyet duyarız:
-
-- **Telegram:** [KriptoKurdu Telegram](https://t.me/kriptokurdugrup)
-- **Twitter:** [@KriptoKurdu](https://twitter.com/KriptoKurduu)
-
----
-
-<p align="center">
-  <strong>KriptoKurdu tarafından ❤️ ile hazırlanmıştır.</strong>
-</p>
+# Aztec düğümünü başlatma
+echo -e "${YESIL}🚦 Aztec düğümü başlatılıyor...${SIFIR}"
+aztec start \
+  --network alpha-testnet \
+  --l1-rpc-urls "$RPC" \
+  --l1-consensus-host-urls "$CONS" \
+  --sequencer.validatorPrivateKey "$VK" \
+  --p2p.p2pIp "$YEREL_IP" \
+  --p2p.maxTxPoolSize 1000000000 \
+  --archiver \
+  --node \
+  --sequencer
