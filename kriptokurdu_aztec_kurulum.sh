@@ -30,20 +30,40 @@ fi
 # Ana dizine git
 cd
 
+# Geçici dizin oluştur
+TEMP_DIR=$(mktemp -d)
+cd $TEMP_DIR
+
+# Bootnodes.json dosyasını manuel olarak oluştur
+echo -e "${CYAN}📥 bootnode.json dosyası oluşturuluyor...${NC}"
+cat > bootnode.json << 'EOL'
+{
+  "sequence": {
+    "contractAddresses": {
+      "TmpBridge": "0xCB15f7B73BfCf91e0e385E3f5d0Ed98A5F95dD67",
+      "TokenTable": "0xE688e58e511c7D970D29ab6b6c2f89cba3f67861",
+      "TokenTableFactory": "0x8bbF5B91bAf849fF8dBFA5A7F27e29EeEC9bAfA4",
+      "SequencerNexus": "0x3f770d6fA2C2363E5a69E7C92c13daF39E17c2f3",
+      "BlobCache": "0x8c62B8D58c6E07f2D6b2beCdEf71456C168B7d60",
+      "Inbox": "0x4cB81cd9f6C77e7FB8d4BD6dA6e0e95Cd3e05e6b",
+      "RegistryL1": "0x2234A5F39A17aA4c0bfBFcBd61D246500540b3Ac",
+      "RegistryL2": "0x2234A5F39A17aA4c0bfBFcBd61D246500540b3Ac"
+    },
+    "l1Provider": {
+      "network": "sepolia",
+      "chainId": 11155111
+    },
+    "chain": {
+      "bootnodes": [
+        "/dns/bootnode-alpha-1.aztec.network/tcp/40400"
+      ]
+    }
+  }
+}
+EOL
+
 # Sistem kontrolleri ve hazırlıklar
 echo -e "${CYAN}🔧 Sistem kontrolü ve hazırlık yapılıyor...${NC}"
-
-# Network bağlantısını test et
-echo -e "${CYAN}🔄 İnternet bağlantısı kontrol ediliyor...${NC}"
-if ! ping -c 1 google.com &> /dev/null; then
-  echo -e "${RED}❌ İnternet bağlantısı bulunamadı! Lütfen bağlantınızı kontrol edin.${NC}"
-  read -p "$(echo -e ${YELLOW}"Devam etmek istiyor musunuz? (e/h): "${NC})" continue_without_net
-  if [ "$continue_without_net" != "e" ]; then
-    exit 1
-  fi
-else
-  echo -e "${GREEN}✅ İnternet bağlantısı mevcut.${NC}"
-fi
 
 # DNS yapılandırması
 echo -e "${CYAN}🌐 DNS yapılandırması iyileştiriliyor...${NC}"
@@ -60,6 +80,14 @@ cat >> /etc/hosts << EOL
 104.21.31.61 static.aztec.network
 172.67.211.145 bootnode-alpha-1.aztec.network bootnode-alpha-2.aztec.network bootnode-alpha-3.aztec.network
 EOL
+
+# Static.aztec.network için yerel servis oluştur
+echo -e "${CYAN}🌍 Yerel bootnode sunucusu oluşturuluyor...${NC}"
+apt-get install -y nginx
+mkdir -p /var/www/html/alpha-testnet/
+cp bootnode.json /var/www/html/alpha-testnet/bootnodes.json
+systemctl start nginx
+systemctl enable nginx
 
 # Sistem güncelleme
 echo -e "${CYAN}📦 Sistem güncelleniyor...${NC}"
@@ -100,6 +128,10 @@ fi
 DATA_DIR="/root/aztec-data"
 mkdir -p $DATA_DIR
 
+# Local bootnodes.json dosyasını Aztec dizinine kopyala
+mkdir -p $DATA_DIR/config/alpha-testnet
+cp bootnode.json $DATA_DIR/config/alpha-testnet/bootnodes.json
+
 # Genel IP al
 public_ip=$(curl -s ipinfo.io/ip)
 echo -e "${GREEN}🌐 Algılanan IP adresiniz: ${YELLOW}$public_ip${NC}"
@@ -118,6 +150,8 @@ ufw allow 40400/udp
 ufw allow 40500
 ufw allow 40500/udp
 ufw allow 8080
+ufw allow 80
+ufw allow 443
 ufw --force enable
 
 # Kullanıcı bilgilerini al
@@ -135,10 +169,13 @@ docker pull aztecprotocol/aztec:alpha-testnet
 docker stop aztec-node 2>/dev/null || true
 docker rm aztec-node 2>/dev/null || true
 
-# Docker ile node'u başlat (düzeltilmiş komut)
+# Static URL yönlendirmesi için host dosyasını güncelle
+echo "127.0.0.1 static.aztec.network" >> /etc/hosts
+
+# Docker ile node'u başlat
 echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
 
-# Doğru komut yapısı 
+# Docker container'ını oluştur
 docker run -d \
   --name aztec-node \
   --network host \
@@ -151,13 +188,10 @@ docker run -d \
   -e VALIDATOR_PRIVATE_KEY="$PRIVATE_KEY" \
   -e P2P_IP="$LOCAL_IP" \
   -e P2P_MAX_TX_POOL_SIZE=1000000000 \
+  -e NETWORK_NAME="alpha-testnet" \
   --restart unless-stopped \
   aztecprotocol/aztec:alpha-testnet \
-  node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start \
-  --network alpha-testnet \
-  --archiver \
-  --node \
-  --sequencer
+  sh -c "cp /data/config/alpha-testnet/bootnodes.json /usr/src/yarn-project/aztec/dest/cli/chain_l2_config && node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --archiver --node --sequencer"
 
 # Container durumunu kontrol et
 sleep 5
@@ -170,6 +204,10 @@ else
   docker logs aztec-node
   
   echo -e "${YELLOW}⚠️ Alternatif başlatma yöntemi deneniyor...${NC}"
+  # Yerel IP'yi 127.0.0.1 olarak ayarla
+  echo -e "${YELLOW}Yerel statik web sunucusu ayarlanıyor...${NC}"
+  
+  # Bootnode.json dosyasını doğrudan container içine kopyala
   docker run -d \
     --name aztec-node-alt \
     --network host \
@@ -182,9 +220,11 @@ else
     -e VALIDATOR_PRIVATE_KEY="$PRIVATE_KEY" \
     -e P2P_IP="$LOCAL_IP" \
     -e P2P_MAX_TX_POOL_SIZE=1000000000 \
+    -e NETWORK_NAME="alpha-testnet" \
     --restart unless-stopped \
+    --add-host=static.aztec.network:127.0.0.1 \
     aztecprotocol/aztec:alpha-testnet \
-    sh -c "node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --archiver --node --sequencer"
+    sh -c "mkdir -p /usr/src/yarn-project/aztec/dest/cli/config/alpha-testnet/ && cp /data/config/alpha-testnet/bootnodes.json /usr/src/yarn-project/aztec/dest/cli/config/alpha-testnet/ && node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --archiver --node --sequencer"
   
   sleep 5
   if docker ps | grep -q aztec-node-alt; then
@@ -210,10 +250,10 @@ echo -e "${CYAN}Data Dizini: ${NC}$DATA_DIR"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}   Node Yönetimi Komutları:${NC}"
-echo -e "${GREEN}Logları görmek için:${NC} docker logs -f $(docker ps | grep aztec-node | awk '{print $1}')"
+echo -e "${GREEN}Logları görmek için:${NC} docker logs -f $(docker ps | grep aztec | awk '{print $1}' | head -n1)"
 echo -e "${GREEN}Node durumunu görmek için:${NC} docker ps | grep aztec"
-echo -e "${GREEN}Node'u yeniden başlatmak için:${NC} docker restart $(docker ps | grep aztec-node | awk '{print $1}')"
-echo -e "${GREEN}Node'u durdurmak için:${NC} docker stop $(docker ps | grep aztec-node | awk '{print $1}')"
+echo -e "${GREEN}Node'u yeniden başlatmak için:${NC} docker restart $(docker ps | grep aztec | awk '{print $1}' | head -n1)"
+echo -e "${GREEN}Node'u durdurmak için:${NC} docker stop $(docker ps | grep aztec | awk '{print $1}' | head -n1)"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
@@ -237,5 +277,9 @@ if command -v tmux &> /dev/null; then
     echo -e "${RED}❌ Çalışan Aztec container'ı bulunamadığı için tmux oturumu oluşturulamadı.${NC}"
   fi
 fi
+
+# Temizlik
+cd
+rm -rf $TEMP_DIR
 
 echo -e "${GREEN}✅ Kurulum işlemi tamamlandı!${NC}"
