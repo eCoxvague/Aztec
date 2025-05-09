@@ -126,19 +126,65 @@ http://localhost:8080 | jq -r ".result"
 
 Komut bir dizi veri döndürecektir bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
 
-## 🔐 Validator Olarak Kayıt
-
+🔐 Validator Olarak Kayıt
 Node'unuzu validator olarak kaydetmek için aşağıdaki adımları takip edin:
+1. Cüzdan Bilgilerinizi Hazırlayın
 
-### 1. Cüzdan Bilgilerinizi Hazırlayın
-- `SEPOLIA-RPC-URL`: Sepolia ağı için bir RPC URL (Infura, Alchemy gibi sağlayıcılardan alabilirsiniz)
-- `CÜZDAN-ÖZEL-ANAHTARINIZ`: Cüzdanınızın özel anahtarı (0x ile başlar)
-- `CÜZDAN-ADRESİNİZ`: Cüzdanınızın adresi (0x ile başlar)
+SEPOLIA-RPC-URL: Sepolia ağı için bir RPC URL (Infura, Alchemy gibi sağlayıcılardan alabilirsiniz)
+CÜZDAN-ÖZEL-ANAHTARINIZ: Cüzdanınızın özel anahtarı (0x ile başlar)
+CÜZDAN-ADRESİNİZ: Cüzdanınızın adresi (0x ile başlar)
 
-### 2. Validator Kayıt Komutunu Çalıştırın
+2. Validator Kayıt Komutunu Çalıştırın
 ```
 aztec add-l1-validator \
   --l1-rpc-urls SEPOLIA-RPC-URL \
   --private-key CÜZDAN-ÖZEL-ANAHTARINIZ \
   --attester CÜZDAN-ADRESİNİZ \
   --proposer-eoa CÜZDAN-ADRESİNİZ \
+  --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \
+  --l1-chain-id 11155111
+```
+4. Doğrulama Durumunuzu Kontrol Edin
+Discord sunucusuna bağlanın ve /operator start komutunu girin. Discord botu size validator rolü verecek ve yönergeler sunacaktır.
+Not: Eğer "ValidatorQuotaFilledUntil" hatası alırsanız, bu günlük validator kotasının dolduğu anlamına gelir. UTC 01:00'den sonra tekrar deneyin.
+
+🔄 Güncelleme Talimatları
+Aztec protokolü güncellendiğinde node'unuzu güncellemek için aşağıdaki adımları takip edin:
+1. Güncelleme Betiğini İndirin ve Çalıştırın
+```
+curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_guncelleme.sh && chmod +x kriptokurdu_aztec_guncelleme.sh && ./kriptokurdu_aztec_guncelleme.sh
+```
+Güncelleme betiği:
+
+Mevcut node'u durduracak
+Yazılımı güncelleyecek
+Eski verileri temizleyecek
+Node'u yeniden başlatacak
+
+2. Güncelleme Sonrası Doğrulama
+Güncelleme tamamlandıktan sonra, node'un düzgün çalıştığından emin olmak için logları kontrol edin:
+```
+sudo docker logs -f $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
+```
+❓ Sık Sorulan Sorular
+Node için ne kadar ödül alacağım?
+Aztec validator node operatörlerine ağın mainnet lansmanı sonrasında teşvikler sunmayı planlıyor. Ayrıntılar için resmi duyuruları takip edin.
+Node'um çalışmayı durdurdu ne yapmalıyım?
+İlk olarak logları kontrol edin. Sorun devam ederse node'u güncelleme betiğimizi kullanarak güncelleyin.
+Doğrulama için neden Sepolia ağını kullanıyoruz?
+Sepolia Aztec'in test ağı entegrasyonu için seçtiği Ethereum test ağıdır. Mainnet lansmanı öncesinde testler bu ağda yapılacaktır.
+Özel anahtar paylaşmak güvenli mi?
+Özel anahtarınızı sadece kendi VPS'inizde kullanın ve asla başkalarıyla paylaşmayın. Güvenlik için test amaçlı yeni bir cüzdan oluşturmanızı öneririz.
+Node'um senkronize olmuyorsa ne yapmalıyım?
+Senkronizasyon sorunları genellikle ağ bağlantısı veya donanım kısıtlamaları nedeniyle oluşur. Sunucunuzun gereksinimleri karşıladığından emin olun ve internet bağlantınızı kontrol edin.
+
+📱 İletişim
+KriptoKurdu ekibi olarak sorularınızı yanıtlamaktan ve size yardımcı olmaktan memnuniyet duyarız:
+
+Telegram: [KriptoKurdu Telegram](https://t.me/kriptokurdugrup)
+Twitter: @KriptoKurduu
+Website: kriptokurdu.com
+
+<p align="center">
+  <strong>KriptoKurdu tarafından ❤️ ile hazırlanmıştır.</strong>
+</p>
