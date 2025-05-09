@@ -53,8 +53,6 @@ nameserver 1.1.1.1
 nameserver 8.8.8.8
 nameserver 8.8.4.4
 EOL
-# resolv.conf'un değiştirilmesini önle
-chattr +i /etc/resolv.conf
 
 # Hosts dosyasını güncelle
 echo -e "${CYAN}📝 Hosts dosyası güncelleniyor...${NC}"
@@ -133,15 +131,15 @@ read -p "$(echo -e ${YELLOW}"🔑 Validator özel anahtarınızı girin: "${NC})
 echo -e "${CYAN}🚀 Aztec Docker imajı çekiliyor...${NC}"
 docker pull aztecprotocol/aztec:alpha-testnet
 
-# Docker container için command oluştur
-echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
-
-# Eski containerı temizle
+# Eski container'ları temizle
 docker stop aztec-node 2>/dev/null || true
 docker rm aztec-node 2>/dev/null || true
 
-# Docker container'ı oluştur
-docker create \
+# Docker ile node'u başlat (düzeltilmiş komut)
+echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
+
+# Doğru komut yapısı 
+docker run -d \
   --name aztec-node \
   --network host \
   -v $DATA_DIR:/data \
@@ -155,28 +153,53 @@ docker create \
   -e P2P_MAX_TX_POOL_SIZE=1000000000 \
   --restart unless-stopped \
   aztecprotocol/aztec:alpha-testnet \
-  start \
+  node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start \
   --network alpha-testnet \
   --archiver \
   --node \
   --sequencer
 
-# Container'ı başlat
-echo -e "${CYAN}⏳ Container başlatılıyor...${NC}"
-docker start aztec-node
-
 # Container durumunu kontrol et
 sleep 5
 if docker ps | grep -q aztec-node; then
   echo -e "${GREEN}✅ Aztec node başarıyla başlatıldı!${NC}"
+  echo -e "${CYAN}📊 Node durumu:${NC}"
+  docker ps | grep aztec-node
 else
   echo -e "${RED}❌ Aztec node başlatılamadı. Logları kontrol ediniz:${NC}"
   docker logs aztec-node
+  
+  echo -e "${YELLOW}⚠️ Alternatif başlatma yöntemi deneniyor...${NC}"
+  docker run -d \
+    --name aztec-node-alt \
+    --network host \
+    -v $DATA_DIR:/data \
+    -e DATA_DIRECTORY=/data \
+    -e ETHEREUM_HOSTS="$RPC_URL" \
+    -e L1_CONSENSUS_HOST_URLS="$CONSENSUS_URL" \
+    -e COINBASE="$COINBASE" \
+    -e LOG_LEVEL=debug \
+    -e VALIDATOR_PRIVATE_KEY="$PRIVATE_KEY" \
+    -e P2P_IP="$LOCAL_IP" \
+    -e P2P_MAX_TX_POOL_SIZE=1000000000 \
+    --restart unless-stopped \
+    aztecprotocol/aztec:alpha-testnet \
+    sh -c "node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --archiver --node --sequencer"
+  
+  sleep 5
+  if docker ps | grep -q aztec-node-alt; then
+    echo -e "${GREEN}✅ Alternatif yöntemle Aztec node başarıyla başlatıldı!${NC}"
+    echo -e "${CYAN}📊 Node durumu:${NC}"
+    docker ps | grep aztec-node-alt
+  else
+    echo -e "${RED}❌ Alternatif yöntem de başarısız oldu.${NC}"
+    docker logs aztec-node-alt
+  fi
 fi
 
 # Container loglarını göster
 echo -e "${CYAN}📋 Container logları:${NC}"
-docker logs --tail 10 aztec-node
+docker logs --tail 20 aztec-node 2>/dev/null || docker logs --tail 20 aztec-node-alt 2>/dev/null
 
 echo -e "${GREEN}✅ Kurulum tamamlandı. Aşağıdaki bilgileri kaydedin:${NC}"
 echo -e "${CYAN}Cüzdan: ${NC}$COINBASE"
@@ -187,24 +210,32 @@ echo -e "${CYAN}Data Dizini: ${NC}$DATA_DIR"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}   Node Yönetimi Komutları:${NC}"
-echo -e "${GREEN}Logları görmek için:${NC} docker logs -f aztec-node"
-echo -e "${GREEN}Node durumunu görmek için:${NC} docker ps | grep aztec-node"
-echo -e "${GREEN}Node'u yeniden başlatmak için:${NC} docker restart aztec-node"
-echo -e "${GREEN}Node'u durdurmak için:${NC} docker stop aztec-node"
+echo -e "${GREEN}Logları görmek için:${NC} docker logs -f $(docker ps | grep aztec-node | awk '{print $1}')"
+echo -e "${GREEN}Node durumunu görmek için:${NC} docker ps | grep aztec"
+echo -e "${GREEN}Node'u yeniden başlatmak için:${NC} docker restart $(docker ps | grep aztec-node | awk '{print $1}')"
+echo -e "${GREEN}Node'u durdurmak için:${NC} docker stop $(docker ps | grep aztec-node | awk '{print $1}')"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}   Validator olarak kaydolmak için:${NC}"
-echo -e "${GREEN}docker run --rm --network host -v $DATA_DIR:/data aztecprotocol/aztec:alpha-testnet add-l1-validator --l1-rpc-urls \"$RPC_URL\" --private-key \"$PRIVATE_KEY\" --attester \"$COINBASE\" --proposer-eoa \"$COINBASE\" --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 --l1-chain-id 11155111${NC}"
+echo -e "${GREEN}docker run --rm --network host -v $DATA_DIR:/data aztecprotocol/aztec:alpha-testnet sh -c \"node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js add-l1-validator --l1-rpc-urls \\\"$RPC_URL\\\" --private-key \\\"$PRIVATE_KEY\\\" --attester \\\"$COINBASE\\\" --proposer-eoa \\\"$COINBASE\\\" --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 --l1-chain-id 11155111\"${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
 
 # Docker servisinin durumunu kontrol et
 echo -e "${CYAN}🔍 Docker servisi durumu:${NC}"
 systemctl status docker --no-pager | grep "Active:"
 
-# Tmux ile log takibi oluştur (opsiyonel)
+# Tmux ile log takibi oluştur
 if command -v tmux &> /dev/null; then
   echo -e "${CYAN}📊 Tmux oturumu oluşturuluyor...${NC}"
-  tmux new-session -d -s aztec-logs "docker logs -f aztec-node"
-  echo -e "${GREEN}✅ Tmux oturumu oluşturuldu. Logları görmek için:${NC} tmux attach -t aztec-logs"
+  CONTAINER_ID=$(docker ps | grep aztec | head -n 1 | awk '{print $1}')
+  if [ -n "$CONTAINER_ID" ]; then
+    tmux kill-session -t aztec-logs 2>/dev/null || true
+    tmux new-session -d -s aztec-logs "docker logs -f $CONTAINER_ID"
+    echo -e "${GREEN}✅ Tmux oturumu oluşturuldu. Logları görmek için:${NC} tmux attach -t aztec-logs"
+  else
+    echo -e "${RED}❌ Çalışan Aztec container'ı bulunamadığı için tmux oturumu oluşturulamadı.${NC}"
+  fi
 fi
+
+echo -e "${GREEN}✅ Kurulum işlemi tamamlandı!${NC}"
