@@ -65,22 +65,22 @@ echo -e "${CYAN}🔧 Sistem güncelleniyor ve gerekli paketler yükleniyor...${N
 apt-get update && apt-get upgrade -y
 apt-get install -y curl jq nginx tmux htop ufw dnsutils net-tools software-properties-common lsb-release apt-transport-https ca-certificates curl
 
-# Docker temizliği (varsa eski sürüm)
-echo -e "${YELLOW}🧹 Eski Docker kurulumu temizleniyor (varsa)...${NC}"
-if command -v docker &> /dev/null; then
-  docker stop \$(docker ps -a -q) 2>/dev/null || true
-  docker rm \$(docker ps -a -q) 2>/dev/null || true
-  docker system prune -af --volumes
-  apt-get purge -y docker-ce docker-ce-cli containerd.io docker docker-engine docker.io runc
-  rm -rf /var/lib/docker /var/lib/containerd /etc/docker
+# 🧹 Eski Docker kurulumu temizleniyor (varsa)…
+if command -v docker > /dev/null 2>&1; then
+  echo -e "${YELLOW}🧹 Eski Docker container ve görüntüler kaldırılıyor…${NC}"
+  containers=$(docker ps -aq)
+  if [ -n "$containers" ]; then
+    docker stop $containers
+    docker rm   $containers
+    docker system prune -af --volumes
+  fi
   echo -e "${GREEN}✅ Eski Docker kaldırıldı.${NC}"
 fi
 
-# Docker kurulumu
-echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
+# 🐳 Docker kuruluyor…
 apt-get install -y docker.io
 systemctl enable docker
-systemctl start docker
+systemctl start  docker
 
 # DNS ve hosts yapılandırması
 cat > /etc/resolv.conf <<EOF
