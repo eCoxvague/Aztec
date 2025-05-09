@@ -27,9 +27,9 @@
 
 ## 🔍 Giriş
 
-Aztec, Ethereum üzerinde çalışan gizlilik odaklı bir L2 (Layer 2) çözümüdür. Bu rehber, Aztec ağının altyapısına katkıda bulunmak isteyen kullanıcılar için sequencer node kurulumunu adım adım anlatmaktadır.
+Aztec Ethereum üzerinde çalışan gizlilik odaklı bir L2 (Layer 2) çözümüdür. Bu rehber Aztec ağının altyapısına katkıda bulunmak isteyen kullanıcılar için sequencer node kurulumunu adım adım anlatmaktadır.
 
-KriptoKurdu ekibi olarak, topluluk üyelerimizin bu teknolojik gelişimlere kolay bir şekilde katılabilmesi için bu rehberi hazırladık. Bu rehberde sunduğumuz kurulum betikleri, süreci otomatikleştirerek herkesin kolayca node çalıştırabilmesini sağlar.
+KriptoKurdu ekibi olarak topluluk üyelerimizin bu teknolojik gelişimlere kolay bir şekilde katılabilmesi için bu rehberi hazırladık. Bu rehberde sunduğumuz kurulum betikleri, süreci otomatikleştirerek herkesin kolayca node çalıştırabilmesini sağlar.
 
 ## 🛠 Gereksinimler
 
@@ -37,7 +37,6 @@ KriptoKurdu ekibi olarak, topluluk üyelerimizin bu teknolojik gelişimlere kola
 - **İşlemci:** 8 çekirdek (minimum)
 - **RAM:** 8GB (minimum), 16GB (önerilen)
 - **Depolama:** 100GB SSD (minimum)
-- **İnternet:** Stabil bir internet bağlantısı
 
 ### Yazılım Gereksinimleri
 - **İşletim Sistemi:** Ubuntu 20.04 LTS veya üzeri
@@ -51,8 +50,10 @@ KriptoKurdu ekibi olarak, topluluk üyelerimizin bu teknolojik gelişimlere kola
 
 ## 🔧 Kurulum Adımları
 
-### 1. VPS Kiralama (Opsiyonel)
-Eğer kendi sunucunuz yoksa, aşağıdaki VPS sağlayıcılardan birini tercih edebilirsiniz:
+### 1. VPS Kiralama
+Eğer kendi sunucunuz yoksa aşağıdaki VPS sağlayıcılardan birini tercih edebilirsiniz:
+
+Contabo 4.5€ yada 7€'luk paket işimize yarayacaktır. Tercihen rahat olmamız için 7€'luk paket idealdir.
 - [Contabo](https://contabo.com/en/vps/) - 4.5€/ay'dan başlayan fiyatlarla
 - [Hetzner](https://www.hetzner.com/cloud) - Avrupa ve ABD lokasyonları
 - [Digital Ocean](https://www.digitalocean.com/) - 8GB RAM Droplet önerilir
@@ -77,7 +78,7 @@ screen -S aztec
 ```
 
 ### 5. Otomatik Kurulum Betiğini Çalıştırma
-KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
+KriptoKurdu özel kurulum betiğini çalıştırın:
 ```
 curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
 ```
@@ -123,7 +124,7 @@ curl -s -X POST -H 'Content-Type: application/json' \
 http://localhost:8080 | jq -r ".result"
 ```
 
-Komut bir dizi veri döndürecektir, bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
+Komut bir dizi veri döndürecektir bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
 
 ## 🔐 Validator Olarak Kayıt
 
