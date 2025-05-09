@@ -35,6 +35,7 @@ TMPDIR=$(mktemp -d)
 cd "$TMPDIR"
 
 # 4) bootnode.json Oluşturma
+echo -e "${CYAN}📄 bootnode.json oluşturuluyor...${NC}"
 cat > bootnode.json << 'EOF'
 {
   "sequence": {
@@ -54,35 +55,28 @@ cat > bootnode.json << 'EOF'
 }
 EOF
 
-# 5) Sistem Güncelleme ve Paket Kurulum
-echo -e "${CYAN}🔧 Sistem güncelleniyor ve temel paketler yükleniyor...${NC}"
+# 5) Sistem Güncelleme & Temel Paketler
+echo -e "${CYAN}🔧 Sistem güncelleniyor ve paketler yükleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 apt-get install -y curl jq lsb-release gnupg2 software-properties-common \
   nginx tmux htop ufw dnsutils net-tools apt-transport-https ca-certificates
 
-# 6) Eski Docker Temizleme
-echo -e "${YELLOW}🧹 Eski Docker kalıntıları temizleniyor...${NC}"
-if command -v docker &>/dev/null; then
-  CONTAINERS=$(docker ps -aq)
-  if [[ -n "$CONTAINERS" ]]; then
-    docker stop $CONTAINERS || true
-    docker rm   $CONTAINERS || true
-  fi
-  docker system prune -af --volumes
-  apt-get purge -y docker-ce docker-ce-cli containerd.io runc docker-engine docker.io
-  rm -rf /var/lib/docker /var/lib/containerd /etc/docker
-  echo -e "${GREEN}✅ Eski Docker kaldırıldı.${NC}"
-fi
+# 6) Eski Docker Paketleri Kaldırma
+echo -e "${YELLOW}🧹 Mevcut Docker paketleri kaldırılıyor...${NC}"
+apt-get purge -y docker-ce docker-ce-cli containerd.io runc docker docker-engine docker.io || true
+rm -rf /var/lib/docker /var/lib/containerd /etc/docker
+
+echo -e "${GREEN}✅ Eski Docker paketleri kaldırıldı (varsa).${NC}"
 
 # 7) Docker Kurulumu
-echo -e "${CYAN}🐳 Docker yükleniyor...${NC}"
+echo -e "${CYAN}🐳 Docker kuruluyor...${NC}"
 apt-get update
 apt-get install -y docker.io
 systemctl enable docker
-systemctl start docker || true
+systemctl start docker
 
 # 7b) Docker Daemon Konfigürasyonu
-echo -e "${CYAN}⚙️ Docker daemon yapılandırması yapılıyor...${NC}"
+echo -e "${CYAN}⚙️ Docker daemon yapılandırması...${NC}"
 cat > /etc/docker/daemon.json <<EOF
 {
   "exec-opts": ["native.cgroupdriver=systemd"],
@@ -98,8 +92,6 @@ ExecStart=
 ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
 EOF
 systemctl daemon-reload
-systemctl restart containerd
-docker info >/dev/null 2>&1
 systemctl restart docker
 
 # 8) DNS ve Hosts Ayarları
@@ -115,11 +107,10 @@ cat >> /etc/hosts <<EOF
 EOF
 
 # 9) Nginx Statik Sunucu
-echo -e "${CYAN}🌍 Nginx ile statik sunucu ayarlanıyor...${NC}"
+echo -e "${CYAN}🌍 Nginx ile statik bootnode sunucusu kuruluyor...${NC}"
 mkdir -p /var/www/html/alpha-testnet/
 cp bootnode.json /var/www/html/alpha-testnet/bootnodes.json
-touch /var/www/html/alpha-testnet/index.html
-systemctl restart nginx
+systemctl enable nginx && systemctl restart nginx
 
 # 10) UFW Güvenlik Duvarı
 echo -e "${CYAN}🧱 Güvenlik duvarı kuralları ekleniyor...${NC}"
@@ -132,20 +123,17 @@ ufw --force enable
 # 11) Aztec CLI Kurulumu
 echo -e "${CYAN}🚀 Aztec CLI kuruluyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
-# PATH Güncellemesi
+
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
 # 12) CLI Wrapper Shebang Düzeltme
 echo -e "${CYAN}🔧 CLI script shebang'ları güncelleniyor...${NC}"
 for f in "$HOME/.aztec/bin/"*; do
-  if [[ -f "$f" ]]; then
-    sed -i '1s|.*|#!/bin/bash|' "$f"
-    chmod +x "$f"
-  fi
+  [[ -f "$f" ]] && sed -i '1s|.*|#!/bin/bash|' "$f" && chmod +x "$f"
 done
 
-# 13) Araçları Güncelleme
+# 13) Aztec Araçları Güncelleme
 echo -e "${CYAN}🔄 Aztec araçları güncelleniyor (alpha-testnet)...${NC}"
 aztec-up alpha-testnet
 
@@ -186,7 +174,8 @@ fi
 echo -e "${CYAN}📂 Data/config dizini oluşturuluyor...${NC}"
 DATA_DIR="$HOME/aztec-data"
 mkdir -p "$DATA_DIR/config"
-curl -s https://static.aztec.network/config/alpha-testnet.json | jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
+curl -s https://static.aztec.network/config/alpha-testnet.json | \
+  jq '.p2pBootstrapNodes=["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' > "$DATA_DIR/config/alpha-testnet.json"
 
 # 18) Home'a Dön
 echo -e "${CYAN}📂 Çalışma dizini home'a getiriliyor...${NC}"
