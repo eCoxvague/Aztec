@@ -1,5 +1,5 @@
 <p align="center">
-# KriptoKurdu'nun Aztec Sequencer Node Kurulum Rehberi
+<strong># KriptoKurdu Aztec Sequencer Node Kurulum Rehberi</strong>
 </p>
 
 <p align="center">
