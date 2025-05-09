@@ -1,186 +1,112 @@
 #!/bin/bash
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.aztec/bin"
-set -e
+
+# Renk tanımları
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # Renk sıfırlama
+
 clear
 
-# Banner
 cat << "EOF"
-╔═══════════════════════════════════════════════════════════╗
-           K R İ P T O   K U R D U   N O D E
-                  Aztec Node Kurulum
-🐺 Twitter:  https://x.com/kriptokurduu
-🌐 Telegram: https://t.me/kriptokurdugrup
-╚═══════════════════════════════════════════════════════════╝
+${CYAN}╔════════════════════════════════════════════════════════════╗
+              ${BLUE}K R İ P T O K U R D U   N O D E
+              ${MAGENTA}by KriptoKurdu${CYAN}
+📡 Twitter:  https://x.com/kriptokurduu
+💬 Telegram: https://t.me/kriptokurdugrup
+╚════════════════════════════════════════════════════════════╝${NC}
 EOF
 
 sleep 2
 
-# Run as root
+# Root kontrolü
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Please run this script as root (sudo)."
+  echo -e "${RED}❌ Lütfen betiği root olarak çalıştırın (sudo su)${NC}"
   exit 1
 fi
 
-# Go to home directory
-echo "📂 Ana dizine geçiliyor..."
 cd ~
 
-# Prepare temp dir
-echo "📁 Geçici dizin hazırlanıyor..."
-TMPDIR=$(mktemp -d)
-cd "$TMPDIR"
+echo -e "${YELLOW}📦 Sistem paketleri güncelleniyor...${NC}"
+apt-get update && apt-get upgrade -y
 
-# Update & dependencies
-echo "🔧 Sistem güncelleniyor ve temel paketler yükleniyor..."
-apt-get update -y
-apt-get install -y \
-  curl jq sed gnupg2 lsb-release ca-certificates \
-  tmux htop ufw nginx dnsutils
+echo -e "${YELLOW}📚 Gerekli bağımlılıklar kuruluyor...${NC}"
+apt install -y \
+  curl iptables build-essential git wget lz4 jq make gcc nano \
+  automake autoconf tmux htop nvme-cli libgbm1 pkg-config \
+  libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip docker.io
 
-# Install Docker CE from official repo
-echo "🐳 Eski Docker paketleri temizleniyor..."
-apt-get remove -y docker docker-engine docker.io containerd runc || true
-rm -rf /var/lib/docker /var/lib/containerd
+echo -e "${GREEN}✅ Bağımlılıklar başarıyla kuruldu${NC}"
 
-echo "🐳 Docker CE reposu ekleniyor..."
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo -e "${YELLOW}🚀 Aztec CLI yüklemesi başlatılıyor...${NC}"
+bash -i <(curl -s https://install.aztec.network)
 
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-   https://download.docker.com/linux/ubuntu \
-   $(lsb_release -cs) stable" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-apt-get update -y
-echo "🐳 Docker CE kuruluyor..."
-apt-get install -y docker-ce docker-ce-cli containerd.io
-
-echo "✅ Docker servisi başlatılıyor..."
-systemctl enable docker
-systemctl start docker
-sleep 2
-if ! systemctl is-active --quiet docker; then
-  echo "❌ Docker servisi başlatılamadı. Lütfen 'systemctl status docker' ile kontrol edin."
-  exit 1
-fi
-echo "✅ Docker servisi çalışıyor."
-
-# ──────────────────────────────────────────────────────────
-# Docker tmp dizini fix
-echo "🛠️  Docker tmp dizini hazırlanıyor..."
-mkdir -p /var/lib/docker/tmp
-chown root:docker /var/lib/docker/tmp
-chmod 711 /var/lib/docker/tmp
-# ──────────────────────────────────────────────────────────
-
-# Aztec imajını çek
-echo "📥 Aztec imajı çekiliyor..."
-docker pull aztecprotocol/aztec:latest
-
-# DNS & hosts
-echo "🌐 DNS ve hosts dosyaları güncelleniyor..."
-cat > /etc/resolv.conf <<EOF
-nameserver 1.1.1.1
-nameserver 8.8.8.8
-EOF
-cat >> /etc/hosts <<EOF
-104.21.31.61 static.aztec.network
-172.67.211.145 bootnode-alpha-1.aztec.network
-EOF
-
-# Nginx static bootnode
-echo "🌍 Nginx ile statik bootnode sunucusu kuruluyor..."
-mkdir -p /var/www/html/alpha-testnet
-cat > /var/www/html/alpha-testnet/bootnodes.json <<EOF
-[ "/dns/bootnode-alpha-1.aztec.network/tcp/40400" ]
-EOF
-systemctl enable nginx
-systemctl restart nginx
-
-# Firewall
-echo "🧱 Güvenlik duvarı kuralları ekleniyor..."
-ufw allow ssh
-ufw allow 40400/tcp
-ufw allow 40400/udp
-ufw --force enable
-
-# Install Aztec CLI
-echo "🚀 Aztec CLI kuruluyor..."
-bash <(curl -s https://install.aztec.network)
+# PATH güncellemesi
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+echo -e "${GREEN}✅ Aztec CLI yüklendi ve PATH güncellendi${NC}"
 
-# Ensure scripts have correct shebang
-for f in ~/.aztec/bin/aztec* ~/.aztec/bin/.aztec-run; do
-  sed -i '1s|.*|#!/bin/bash|' "$f"
-  chmod +x "$f"
-done
-
-# Initialize and upgrade
-aztec version >/dev/null 2>&1 || true
+echo -e "${YELLOW}⚙️  Aztec CLI alpha-testnet için başlatılıyor...${NC}"
+aztec
 aztec-up alpha-testnet
 
-# Prompt inputs
-read -p "🔐 EVM wallet address: " COINBASE
-read -p "🌍 Sepolia RPC URL (ETHEREUM_HOSTS): " RPC_URL
+# Otomatik IP algılama
+echo -e "${YELLOW}🌐 Genel IP adresiniz algılanıyor...${NC}"
+PUBLIC_IP=$(curl -s https://ipinfo.io/ip)
+echo -e "${GREEN}Algılanan IP:${NC} ${BLUE}$PUBLIC_IP${NC}"
 
-# Public IP
-PUBLIC_IP=$(curl -s https://api.ipify.org)
-echo "🌐 Detected public IP: $PUBLIC_IP"
-read -p "Use this IP? (y/n): " yn
-if [ "$yn" != "y" ]; then
-  read -p "📡 Enter your public IP: " PUBLIC_IP
-fi
+# EVM cüzdan adresi
+read -p "$(echo -e ${CYAN}🔐 EVM cüzdan adresinizi girin:${NC} )" COINBASE
 
-# Beacon RPC test
-echo "🛰️ Beacon RPC test ediliyor..."
-for url in "https://rpc.drpc.org/eth/sepolia/beacon" "https://lodestar-sepolia.chainsafe.io"; do
-  echo -n "  Testing $url... "
-  if curl -sf --connect-timeout 5 "$url" -o /dev/null; then
-    CONSENSUS_URL="$url"
-    echo "OK"
+# Sepolia RPC URL’si
+read -p "$(echo -e ${CYAN}🌍 Ethereum Sepolia RPC URL’si girin (örnek: Alchemy):${NC} )" RPC_URL
+
+# Beacon RPC otomatik seçimi
+echo -e "${YELLOW}🔍 Beacon consensus RPC uç noktaları test ediliyor...${NC}"
+for URL in \
+  "https://rpc.drpc.org/eth/sepolia/beacon" \
+  "https://lodestar-sepolia.chainsafe.io"
+do
+  if curl -s -X POST "$URL" \
+       -H "Content-Type: application/json" \
+       -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+       | grep -q '"result"'; then
+    BEACON_URL="$URL"
+    echo -e "${GREEN}✔️  Kullanılan Beacon RPC:${NC} ${BLUE}$BEACON_URL${NC}"
     break
-  else
-    echo "FAIL"
   fi
 done
-if [ -z "$CONSENSUS_URL" ]; then
-  read -p "🛰️ Enter working Beacon RPC URL: " CONSENSUS_URL
+
+if [ -z "$BEACON_URL" ]; then
+  echo -e "${RED}❌ Çalışan Beacon RPC uç noktası bulunamadı. Betik sonlandırılıyor.${NC}"
+  exit 1
 fi
 
-read -p "🔑 Validator private key: " PRIVATE_KEY
+# Validator özel anahtar (gizli giriş)
+read -s -p "$(echo -e ${CYAN}🔑 Validator özel anahtarınızı girin:${NC} )" PRIVATE_KEY
+echo
 
-# bootnodes JSON for Docker config
-DATA_DIR="/root/aztec-data"
-mkdir -p "$DATA_DIR/config"
-curl -s https://static.aztec.network/config/alpha-testnet.json | \
-  jq '.p2pBootstrapNodes = ["/dns/bootnode-alpha-1.aztec.network/tcp/40400"]' \
-  > "$DATA_DIR/config/alpha-testnet.json"
+# Ortam değişkenleri
+export DATA_DIRECTORY=/root/aztec-data/
+export COINBASE
+export LOG_LEVEL=debug
+export P2P_MAX_TX_POOL_SIZE=1000000000
+export ETH_RPC_URL="$RPC_URL"
+export ETH_BEACON_RPC_URL="$BEACON_URL"
+export LOCAL_IP="$PUBLIC_IP"
 
-echo "🚦 Starting Aztec node..."
+# Aztec node’u başlat
+echo -e "${YELLOW}🚦 Aztec node başlatılıyor...${NC}"
 aztec start \
   --network alpha-testnet \
-  --l1-rpc-urls "$RPC_URL" \
-  --l1-consensus-host-urls "$CONSENSUS_URL" \
+  --l1-rpc-urls "$ETH_RPC_URL" \
+  --l1-consensus-host-urls "$ETH_BEACON_RPC_URL" \
   --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-  --sequencer.coinbase "$COINBASE" \          ← bu satırı ekle
-  --p2p.p2pIp "$PUBLIC_IP" \
-  --p2p.maxTxPoolSize 1000000000 \
+  --p2p.p2pIp "$LOCAL_IP" \
+  --p2p.maxTxPoolSize "$P2P_MAX_TX_POOL_SIZE" \
   --archiver \
   --node \
   --sequencer
-
-# Log follow hints
-cat <<EOF
-✅ Node start komutu gönderildi.
-Logları izlemek için:
-  aztec logs --follow
-veya
-  docker logs -f aztec-node
-EOF
-
-# Cleanup
-cd ~
-rm -rf "$TMPDIR"
