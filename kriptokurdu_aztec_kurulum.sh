@@ -30,13 +30,34 @@ fi
 # Ana dizine git
 cd
 
+# DNS yapılandırması kontrol et ve Google DNS ekle
+echo -e "${CYAN}🌐 DNS yapılandırması kontrol ediliyor ve Google DNS ekleniyor...${NC}"
+if ! grep -q "nameserver 8.8.8.8" /etc/resolv.conf; then
+  echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+fi
+if ! grep -q "nameserver 8.8.4.4" /etc/resolv.conf; then
+  echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+fi
+
+# DNS'yi test et
+echo -e "${CYAN}🔍 DNS çözümlemesi test ediliyor...${NC}"
+if ! host static.aztec.network > /dev/null 2>&1; then
+  echo -e "${YELLOW}⚠️ static.aztec.network alan adı çözümlenemiyor.${NC}"
+  echo -e "${YELLOW}Manuel IP eklemesi yapılıyor...${NC}"
+  # static.aztec.network için hosts dosyasına IP ekle
+  if ! grep -q "static.aztec.network" /etc/hosts; then
+    echo "104.21.31.61 static.aztec.network" >> /etc/hosts
+    echo "172.67.211.145 static.aztec.network" >> /etc/hosts
+  fi
+fi
+
 # Sistem güncelleme
 echo -e "${CYAN}📦 Sistem güncelleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 
 # Bağımlılıkları yükle
 echo -e "${CYAN}📚 Gerekli paketler yükleniyor...${NC}"
-apt install curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev -y
+apt install curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev dnsutils resolvconf -y
 
 # Docker temizliği
 echo -e "${YELLOW}🧹 Docker temizleniyor (eğer varsa)...${NC}"
@@ -57,6 +78,10 @@ systemctl enable docker
 systemctl start docker
 docker --version
 echo -e "${GREEN}Docker kurulumu tamamlandı.${NC}"
+
+# DNS ayarlarını yeniden kontrol et
+echo -e "${CYAN}🔄 DNS çözümlemesi yeniden kontrol ediliyor...${NC}"
+host static.aztec.network || echo -e "${YELLOW}⚠️ DNS sorunu devam ediyor. Elle IP adresini kullanarak devam edilecek.${NC}"
 
 # Aztec CLI yükle
 echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
@@ -79,10 +104,30 @@ export PATH="$HOME/.aztec/bin:$PATH"
 # Aztec komutlarını çalıştır
 echo -e "${CYAN}Aztec alpha-testnet yükleniyor...${NC}"
 if [ -f "$AZTEC_UP_CMD" ]; then
-  $AZTEC_UP_CMD alpha-testnet
+  # Network bağlantısını test et
+  if ping -c 1 static.aztec.network > /dev/null 2>&1 || curl -s --head static.aztec.network | grep "200 OK" > /dev/null; then
+    $AZTEC_UP_CMD alpha-testnet
+  else
+    echo -e "${YELLOW}⚠️ static.aztec.network sunucusuna erişilemiyor. Offline yükleme işlemi başlatılıyor...${NC}"
+    
+    # Alternatif olarak doğrudan Docker imajını çek
+    echo -e "${CYAN}Docker imajı doğrudan çekiliyor...${NC}"
+    docker pull aztecprotocol/aztec:alpha-testnet
+    
+    # Aztec config dosyasını manuel oluştur
+    mkdir -p "/root/.aztec/alpha-testnet"
+    echo -e "${YELLOW}Yapılandırma dosyası manuel olarak oluşturuluyor...${NC}"
+  fi
 else
   echo -e "${RED}Aztec-up bulunamadı. Tam yolunu kontrol edin: $AZTEC_UP_CMD${NC}"
-  find / -name "aztec-up" -type f 2>/dev/null | head -n 1
+  FOUND_PATH=$(find / -name "aztec-up" -type f 2>/dev/null | head -n 1)
+  if [ -n "$FOUND_PATH" ]; then
+    echo -e "${GREEN}Aztec-up burada bulundu: $FOUND_PATH${NC}"
+    $FOUND_PATH alpha-testnet
+  else
+    echo -e "${RED}Aztec-up bulunamadı. Doğrudan Docker imajını kullanarak devam edilecek.${NC}"
+    docker pull aztecprotocol/aztec:alpha-testnet
+  fi
 fi
 
 # Genel IP al
@@ -107,8 +152,9 @@ ufw --force enable
 read -p "$(echo -e ${YELLOW}"🔐 EVM cüzdan adresinizi girin: "${NC})" COINBASE
 
 # Çevre değişkenlerini ayarla
-export DATA_DIRECTORY=/root/aztec-data/
-export COINBASE=$COINBASE
+DATA_DIRECTORY=/root/aztec-data/
+export DATA_DIRECTORY
+export COINBASE
 export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
@@ -124,39 +170,45 @@ export L1_CONSENSUS_HOST_URLS=$CONSENSUS_URL
 export VALIDATOR_PRIVATE_KEY=$PRIVATE_KEY
 export P2P_IP=$LOCAL_IP
 
-# Aztec node başlat (tam yolları kullanarak)
-echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
-if [ -f "$AZTEC_CMD" ]; then
-  # Tam yolla başlat
-  $AZTEC_CMD start --network alpha-testnet \
-    --l1-rpc-urls "$RPC_URL" \
-    --l1-consensus-host-urls "$CONSENSUS_URL" \
-    --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-    --sequencer.coinbase "$COINBASE" \
-    --p2p.p2pIp "$LOCAL_IP" \
-    --p2p.maxTxPoolSize 1000000000 \
-    --archiver \
-    --node \
-    --sequencer
+# DNS sorunlarını önleyici olarak hosts dosyasını güncelle
+echo -e "${YELLOW}Kritik sunucuları hosts dosyasına ekliyoruz...${NC}"
+echo "104.21.31.61 static.aztec.network" >> /etc/hosts
+echo "172.67.211.145 static.aztec.network" >> /etc/hosts
+echo "172.67.211.145 bootnode-alpha-1.aztec.network" >> /etc/hosts
+echo "104.21.31.61 bootnode-alpha-1.aztec.network" >> /etc/hosts
+
+# Docker ile node'u başlat (DNS sorunlarına karşı daha dirençli)
+echo -e "${GREEN}🚦 Aztec node başlatılıyor (Docker ile doğrudan)...${NC}"
+mkdir -p $DATA_DIRECTORY
+
+# Aztec node başlatma komutu
+AZURE_NODE_COMMAND="docker run -d --name aztec-node --restart unless-stopped --network host -v $DATA_DIRECTORY:/data \
+-e ETHEREUM_HOSTS=\"$RPC_URL\" \
+-e L1_CONSENSUS_HOST_URLS=\"$CONSENSUS_URL\" \
+-e COINBASE=\"$COINBASE\" \
+-e VALIDATOR_PRIVATE_KEY=\"$PRIVATE_KEY\" \
+-e P2P_IP=\"$LOCAL_IP\" \
+-e LOG_LEVEL=debug \
+-e P2P_MAX_TX_POOL_SIZE=1000000000 \
+aztecprotocol/aztec:alpha-testnet \
+start \
+--network alpha-testnet \
+--archiver \
+--node \
+--sequencer"
+
+echo -e "${YELLOW}Docker komutu çalıştırılıyor...${NC}"
+echo $AZURE_NODE_COMMAND
+eval $AZURE_NODE_COMMAND
+
+# Node durumunu kontrol et
+sleep 5
+if docker ps | grep -q "aztec-node"; then
+  echo -e "${GREEN}✅ Aztec node başarıyla çalıştırıldı.${NC}"
+  echo -e "${YELLOW}Container loglarını görmek için: ${NC}docker logs -f aztec-node"
 else
-  echo -e "${RED}❌ Aztec CLI bulunamadı. Sistem PATH değişkenlerini yenilemeye çalışıyoruz...${NC}"
-  
-  # PATH sorunlarına karşı alternatif yöntemler
-  echo -e "${YELLOW}Alternatif komutları deniyoruz...${NC}"
-  
-  # Docker ile doğrudan başlatma
-  echo -e "${YELLOW}Docker ile doğrudan başlatmayı deniyoruz...${NC}"
-  docker run --network host -v /root/aztec-data:/data aztecprotocol/aztec:latest start \
-    --network alpha-testnet \
-    --l1-rpc-urls "$RPC_URL" \
-    --l1-consensus-host-urls "$CONSENSUS_URL" \
-    --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-    --sequencer.coinbase "$COINBASE" \
-    --p2p.p2pIp "$LOCAL_IP" \
-    --p2p.maxTxPoolSize 1000000000 \
-    --archiver \
-    --node \
-    --sequencer
+  echo -e "${RED}❌ Aztec node başlatılamadı. Docker container başlatma hatası.${NC}"
+  docker logs aztec-node
 fi
 
 echo -e "${GREEN}✅ Kurulum tamamlandı. Aşağıdaki bilgileri kaydedin:${NC}"
@@ -166,9 +218,31 @@ echo -e "${CYAN}Consensus URL: ${NC}$CONSENSUS_URL"
 echo -e "${CYAN}IP Adresi: ${NC}$LOCAL_IP"
 
 echo -e "${YELLOW}Manuel komut (gerekirse):${NC}"
-echo -e "${GREEN}$AZTEC_CMD start --network alpha-testnet --l1-rpc-urls \"$RPC_URL\" --l1-consensus-host-urls \"$CONSENSUS_URL\" --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" --sequencer.coinbase \"$COINBASE\" --p2p.p2pIp \"$LOCAL_IP\" --p2p.maxTxPoolSize 1000000000 --archiver --node --sequencer${NC}"
+echo -e "${GREEN}docker run --network host -v $DATA_DIRECTORY:/data \
+-e ETHEREUM_HOSTS=\"$RPC_URL\" \
+-e L1_CONSENSUS_HOST_URLS=\"$CONSENSUS_URL\" \
+-e COINBASE=\"$COINBASE\" \
+-e VALIDATOR_PRIVATE_KEY=\"$PRIVATE_KEY\" \
+-e P2P_IP=\"$LOCAL_IP\" \
+-e LOG_LEVEL=debug \
+-e P2P_MAX_TX_POOL_SIZE=1000000000 \
+aztecprotocol/aztec:alpha-testnet \
+start \
+--network alpha-testnet \
+--archiver \
+--node \
+--sequencer${NC}"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}   Validator olarak kaydolmak için aşağıdaki komutu kullanın:${NC}"
-echo -e "${GREEN}$AZTEC_CMD add-l1-validator --l1-rpc-urls \"$RPC_URL\" --private-key \"$PRIVATE_KEY\" --attester \"$(echo $COINBASE)\" --proposer-eoa \"$(echo $COINBASE)\" --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 --l1-chain-id 11155111${NC}"
+echo -e "${GREEN}docker run --network host -v $DATA_DIRECTORY:/data aztecprotocol/aztec:alpha-testnet add-l1-validator --l1-rpc-urls \"$RPC_URL\" --private-key \"$PRIVATE_KEY\" --attester \"$COINBASE\" --proposer-eoa \"$COINBASE\" --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 --l1-chain-id 11155111${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
+
+echo -e "${CYAN}📋 Node çalışma durumunu kontrol etmek için:${NC}"
+echo -e "${YELLOW}docker ps | grep aztec${NC}"
+echo -e "${CYAN}📊 Node loglarını görmek için:${NC}"
+echo -e "${YELLOW}docker logs -f aztec-node${NC}"
+echo -e "${CYAN}🔄 Node'u yeniden başlatmak için:${NC}"
+echo -e "${YELLOW}docker restart aztec-node${NC}"
+echo -e "${CYAN}🛑 Node'u durdurmak için:${NC}"
+echo -e "${YELLOW}docker stop aztec-node${NC}"
