@@ -21,10 +21,19 @@ echo "║                                                           ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 
+# Root kontrolü
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${KIRMIZI}❌ Lütfen bu betiği root olarak çalıştırın: sudo su${RESET}"
+  exit 1
+fi
+
 # Başlatma Mesajı
 echo -e "${BEYAZ}KriptoKurdu Aztec Node Kurulum Sihirbazına Hoş Geldiniz!${RESET}"
 echo -e "${YESIL}Bu sihirbaz sisteminize Aztec sequencer node'u kuracak ve başlatacaktır.${RESET}"
 echo -e "${SARI}Lütfen kurulum tamamlanana kadar bekleyin...${RESET}\n"
+
+# Ana dizine git
+cd
 
 # Sistem kontrolü
 echo -e "${TURKUAZ}══════════ Sistem Kontrolü ══════════${RESET}"
@@ -64,48 +73,42 @@ echo -e "\n${BEYAZ}Sistem gereksinimleri karşılanmıyor olsa bile kuruluma dev
 echo -e "${BEYAZ}Devam etmek için ENTER tuşuna basın, iptal etmek için CTRL+C tuşuna basın...${RESET}"
 read -r
 
-echo -e "\n${TURKUAZ}══════════ Gerekli Paketler Yükleniyor ══════════${RESET}"
+echo -e "\n${TURKUAZ}══════════ Sistem Güncelleniyor ══════════${RESET}"
 echo -e "${BEYAZ}Sistem paketleri güncelleniyor...${RESET}"
-sudo apt update && sudo apt upgrade -y
+apt-get update && apt-get upgrade -y
 
 echo -e "${BEYAZ}Gerekli temel paketler yükleniyor...${RESET}"
-sudo apt install -y curl wget git build-essential jq pkg-config libssl-dev bc screen libleveldb-dev
+apt install -y curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip
 
 # Docker Kontrolü ve Kurulumu
+echo -e "\n${TURKUAZ}══════════ Docker Kuruluyor ══════════${RESET}"
 if ! command -v docker &> /dev/null; then
     echo -e "${BEYAZ}Docker kuruluyor...${RESET}"
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
+    apt install -y docker.io
+    systemctl enable --now docker
     echo -e "${YESIL}✅ Docker başarıyla kuruldu!${RESET}"
 else
     DOCKER_VERSION=$(docker --version | awk '{print $3}' | sed 's/,//')
     echo -e "${YESIL}✅ Docker zaten kurulu. Sürüm: $DOCKER_VERSION${RESET}"
 fi
 
-# UFW kurulumunu kontrol et ve yükle
+# UFW kurulumu ve yapılandırması
 echo -e "\n${TURKUAZ}══════════ Güvenlik Duvarı Yapılandırılıyor ══════════${RESET}"
 if ! command -v ufw &> /dev/null; then
     echo -e "${BEYAZ}UFW (Uncomplicated Firewall) kuruluyor...${RESET}"
-    sudo apt-get install -y ufw
+    apt-get install -y ufw
     echo -e "${YESIL}✅ UFW başarıyla kuruldu!${RESET}"
 else
     echo -e "${YESIL}✅ UFW zaten kurulu.${RESET}"
 fi
 
-# Güvenlik duvarı yapılandırması
 echo -e "${BEYAZ}Gerekli portlar açılıyor...${RESET}"
-if command -v ufw &> /dev/null; then
-    sudo ufw allow ssh
-    sudo ufw allow 40400
-    sudo ufw allow 40500
-    sudo ufw allow 8080
-    sudo ufw --force enable
-    echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
-else
-    echo -e "${SARI}⚠️ UFW yüklenemedi, güvenlik duvarı yapılandırılmadı.${RESET}"
-    echo -e "${SARI}⚠️ Kurulum devam edecek, ancak portları manuel olarak açmanız gerekebilir.${RESET}"
-fi
+ufw allow ssh
+ufw allow 40400
+ufw allow 40500
+ufw allow 8080
+ufw --force enable
+echo -e "${YESIL}✅ Güvenlik duvarı yapılandırması tamamlandı${RESET}"
 
 echo -e "\n${TURKUAZ}══════════ Aztec Kurulumu ══════════${RESET}"
 echo -e "${BEYAZ}Aztec CLI kuruluyor (resmi Aztec kurulum betiği)...${RESET}"
@@ -113,66 +116,71 @@ echo -e "${BEYAZ}Aztec CLI kuruluyor (resmi Aztec kurulum betiği)...${RESET}"
 # Aztec'in resmi kurulum betiğini kullan
 bash -i <(curl -s https://install.aztec.network)
 
-# Kurulum sonrası PATH'i hemen güncelleyelim
-export PATH="$HOME/.aztec/bin:$PATH"
-source ~/.bashrc 2>/dev/null || true
-
-# Daha güvenilir kurulum kontrolü
-if [ -f "$HOME/.aztec/bin/aztec" ]; then
-    echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
-else
-    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız oldu. Lütfen manuel olarak kontrol edin.${RESET}"
-    echo -e "${SARI}Kurulum işlemi devam edecek, ancak aşağıdaki komutu manuel olarak çalıştırmanız gerekebilir:${RESET}"
-    echo -e "${YESIL}export PATH=\"\$HOME/.aztec/bin:\$PATH\"${RESET}"
-fi
-
 # PATH güncellemesini bash profiline ekle
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+export PATH="$HOME/.aztec/bin:$PATH"
 
-# Kurulum başarılı mı kontrol et - doğrudan yoldan kontrol edelim
-if [ ! -f "$HOME/.aztec/bin/aztec" ]; then
-    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız olmuş olabilir. Devam edilecek ama dikkatli olun.${RESET}"
+# IP adresini al
+PUBLIC_IP=$(curl -s ipinfo.io/ip)
+echo -e "\n${BEYAZ}🌐 Sunucu IP Adresi: ${YESIL}$PUBLIC_IP${RESET}"
+echo -e "${SARI}⚠️  Lütfen bu IP adresini not alın, validator kayıt işleminde gerekecektir.${RESET}"
+echo -e "${BEYAZ}IP adresinizi kaydettiniz mi? (e/h): ${RESET}"
+read -r SAVED_IP
+if [[ "$SAVED_IP" != "e" && "$SAVED_IP" != "E" ]]; then
+    echo -e "${KIRMIZI}❗ Lütfen IP adresinizi kaydedin ve betiği tekrar çalıştırın.${RESET}"
+    exit 1
 fi
 
-# Kullanıcıdan Ethereum RPC URL'ini al (opsiyonel)
-echo -e "\n${BEYAZ}Ethereum Sepolia RPC URL'nizi girin (boş bırakabilirsiniz):${RESET}"
-echo -e "${SARI}Örnek: https://sepolia.infura.io/v3/YOUR-KEY${RESET}"
+# Veri dizini oluştur
+mkdir -p /root/aztec-data/
+
+# Çevre değişkenleri için cüzdan adresi al
+echo -e "\n${TURKUAZ}══════════ Cüzdan Bilgileri ══════════${RESET}"
+echo -e "${BEYAZ}🔐 Ethereum cüzdan adresinizi girin: ${RESET}"
+read -r COINBASE
+
+# Çevre değişkenlerini ayarla
+export DATA_DIRECTORY=/root/aztec-data/
+export COINBASE=$COINBASE
+export LOG_LEVEL=debug
+export P2P_MAX_TX_POOL_SIZE=1000000000
+
+# RPC ve diğer bilgileri al
+echo -e "\n${TURKUAZ}══════════ RPC Bilgileri ══════════${RESET}"
+echo -e "${BEYAZ}🌍 Ethereum Sepolia RPC URL'nizi girin:${RESET}"
+echo -e "${SARI}(Buradan alabilirsiniz: https://dashboard.alchemy.com/apps/)${RESET}"
 read -r RPC_URL
+
+echo -e "${BEYAZ}🛰️ Ethereum Beacon Consensus RPC URL'nizi girin:${RESET}"
+echo -e "${SARI}(Buradan alabilirsiniz: https://console.chainstack.com/user/login)${RESET}"
+read -r CONSENSUS_URL
+
+echo -e "${BEYAZ}📡 Az önce kaydettiğiniz IP adresinizi girin:${RESET}"
+read -r LOCAL_IP
+
+echo -e "${BEYAZ}🔑 Validator özel anahtarınızı girin:${RESET}"
+read -r PRIVATE_KEY
 
 echo -e "\n${TURKUAZ}══════════ Aztec Node Başlatılıyor ══════════${RESET}"
 echo -e "${BEYAZ}Aztec node başlatılıyor. Bu işlem biraz zaman alabilir...${RESET}"
 echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse endişelenmeyin, bu normaldir.${RESET}"
 
-# PATH'i güncelle (bazı sistemlerde gerekli olabilir)
-export PATH="$HOME/.aztec/bin:$PATH"
-
-# Aztec başlatma komutunu çalıştır
-AZTEC_BIN="$HOME/.aztec/bin/aztec"
-if [ -f "$AZTEC_BIN" ]; then
-    # Aztec'i başlat (RPC URL girildiyse kullan)
-    if [ -z "$RPC_URL" ]; then
-        $AZTEC_BIN start --network alpha-testnet --node --archiver || {
-            echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
-        }
-    else
-        $AZTEC_BIN start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver || {
-            echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
-        }
-    fi
-else
-    echo -e "${KIRMIZI}❌ Aztec komutu bulunamadı. Kurulum tamamlanamadı.${RESET}"
-    echo -e "${SARI}Lütfen manuel olarak 'bash -i <(curl -s https://install.aztec.network)' komutunu çalıştırın ve kurulumu tamamlayın.${RESET}"
-fi
+# Aztec node'u tam parametrelerle başlat
+aztec start \
+  --network alpha-testnet \
+  --l1-rpc-urls "$RPC_URL" \
+  --l1-consensus-host-urls "$CONSENSUS_URL" \
+  --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+  --p2p.p2pIp "$LOCAL_IP" \
+  --p2p.maxTxPoolSize 1000000000 \
+  --archiver \
+  --node \
+  --sequencer
 
 # Kurulumu tamamla
 echo -e "\n${TURKUAZ}══════════ Kurulum Tamamlandı ══════════${RESET}"
 echo -e "${YESIL}✅ KriptoKurdu Aztec Node kurulum işlemi tamamlandı!${RESET}\n"
-
-# IP adresini al
-PUBLIC_IP=$(curl -s ipinfo.io/ip)
-echo -e "${BEYAZ}🌐 Sunucu IP Adresi: ${YESIL}$PUBLIC_IP${RESET}"
-echo -e "${SARI}⚠️  Lütfen bu IP adresini not alın, validator kayıt işleminde gerekecektir.${RESET}\n"
 
 # Yardımcı Bilgiler
 echo -e "${MOR}══════════ Önemli Komutlar ══════════${RESET}"
@@ -207,7 +215,7 @@ echo -e "${SARI}Doğrulayıcı kaydı sırasında 'ValidatorQuotaFilledUntil' ha
 echo -e "${SARI}bu günlük kota dolduğu anlamına gelir. 01:00 UTC'den sonra tekrar deneyin.${RESET}\n"
 
 echo -e "${BEYAZ}Node'u durdurmak için:${RESET} ${YESIL}aztec stop${RESET}"
-echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver${RESET}\n"
+echo -e "${BEYAZ}Node'u başlatmak için:${RESET} ${YESIL}aztec start --network alpha-testnet --node --archiver --sequencer${RESET}\n"
 
 echo -e "${TURKUAZ}╔═══════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${TURKUAZ}║               ${BEYAZ}KriptoKurdu!${TURKUAZ}              ║${RESET}"
