@@ -113,17 +113,26 @@ echo -e "${BEYAZ}Aztec CLI kuruluyor (resmi Aztec kurulum betiği)...${RESET}"
 # Aztec'in resmi kurulum betiğini kullan
 bash -i <(curl -s https://install.aztec.network)
 
+# Kurulum sonrası PATH'i hemen güncelleyelim
+export PATH="$HOME/.aztec/bin:$PATH"
+source ~/.bashrc 2>/dev/null || true
+
+# Daha güvenilir kurulum kontrolü
+if [ -f "$HOME/.aztec/bin/aztec" ]; then
+    echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
+else
+    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız oldu. Lütfen manuel olarak kontrol edin.${RESET}"
+    echo -e "${SARI}Kurulum işlemi devam edecek, ancak aşağıdaki komutu manuel olarak çalıştırmanız gerekebilir:${RESET}"
+    echo -e "${YESIL}export PATH=\"\$HOME/.aztec/bin:\$PATH\"${RESET}"
+fi
+
 # PATH güncellemesini bash profiline ekle
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
-# Kurulum başarılı mı kontrol et
-if ! command -v aztec &> /dev/null; then
-    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız oldu. Lütfen manuel olarak kontrol edin.${RESET}"
-    # Kurulum başarısız olsa bile devam et, kullanıcıya bilgi ver
-    echo -e "${SARI}Kurulum işlemi devam edecek, ancak Aztec CLI komutları çalışmayabilir.${RESET}"
-else
-    echo -e "${YESIL}✅ Aztec CLI başarıyla kuruldu!${RESET}"
+# Kurulum başarılı mı kontrol et - doğrudan yoldan kontrol edelim
+if [ ! -f "$HOME/.aztec/bin/aztec" ]; then
+    echo -e "${KIRMIZI}❌ Aztec kurulumu başarısız olmuş olabilir. Devam edilecek ama dikkatli olun.${RESET}"
 fi
 
 # Kullanıcıdan Ethereum RPC URL'ini al (opsiyonel)
@@ -139,14 +148,15 @@ echo -e "${SARI}Not: İşlem sırasında komut çıktısı görüntülenmezse en
 export PATH="$HOME/.aztec/bin:$PATH"
 
 # Aztec başlatma komutunu çalıştır
-if command -v aztec &> /dev/null; then
+AZTEC_BIN="$HOME/.aztec/bin/aztec"
+if [ -f "$AZTEC_BIN" ]; then
     # Aztec'i başlat (RPC URL girildiyse kullan)
     if [ -z "$RPC_URL" ]; then
-        aztec start --network alpha-testnet --node --archiver || {
+        $AZTEC_BIN start --network alpha-testnet --node --archiver || {
             echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
         }
     else
-        aztec start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver || {
+        $AZTEC_BIN start --network alpha-testnet --l1-rpc-urls "$RPC_URL" --node --archiver || {
             echo -e "${KIRMIZI}❌ Aztec node başlatılamadı. Lütfen manuel olarak kontrol edin.${RESET}"
         }
     fi
