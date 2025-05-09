@@ -180,7 +180,7 @@ echo -e "${BEYAZ}MetaMask > Hesap Oluştur > Hesap Ayarları > Özel Anahtarı D
 
 # Çevre değişkenleri için cüzdan adresi al
 echo -e "\n${TURKUAZ}══════════ Cüzdan Bilgileri ══════════${RESET}"
-echo -e "${BEYAZ}🔐 Blok ödüllerini alacak Ethereum cüzdan adresinizi girin (coinbase): ${RESET}"
+echo -e "${BEYAZ}🔐 Blok ödüllerini alacak Ethereum cüzdan adresinizi girin: ${RESET}"
 read -r COINBASE
 
 # Cüzdan adresi formatını kontrol et
@@ -196,19 +196,6 @@ export COINBASE=$COINBASE
 export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
-# RPC Önerileri
-echo -e "\n${TURKUAZ}══════════ RPC Önerileri ══════════${RESET}"
-echo -e "${BEYAZ}Sepolia RPC URL için öneriler:${RESET}"
-echo -e "${YESIL}- https://rpc.sepolia.org${RESET}"
-echo -e "${YESIL}- https://ethereum-sepolia.publicnode.com${RESET}"
-echo -e "${YESIL}- Alchemy: https://eth-sepolia.g.alchemy.com/v2/YOUR-API-KEY${RESET}"
-echo -e "${YESIL}- Infura: https://sepolia.infura.io/v3/YOUR-API-KEY${RESET}"
-
-echo -e "${BEYAZ}Consensus RPC URL için öneriler:${RESET}"
-echo -e "${YESIL}- Quicknode: https://billowing-broken-river.ethereum-sepolia.quiknode.pro/YOUR-API-KEY/${RESET}"
-echo -e "${YESIL}- dRPC: https://lb.drpc.org/ogrpc?network=sepolia&dkey=YOUR-API-KEY${RESET}"
-echo -e "${YESIL}- https://ethereum-sepolia-beacon-chain.publicnode.com${RESET}"
-
 # RPC ve diğer bilgileri al
 echo -e "\n${TURKUAZ}══════════ RPC Bilgileri ══════════${RESET}"
 echo -e "${BEYAZ}🌍 Ethereum Sepolia RPC URL'nizi girin (veya varsayılan için boş bırakın):${RESET}"
@@ -223,7 +210,7 @@ echo -e "${BEYAZ}🛰️ Ethereum Beacon Consensus RPC URL'nizi girin (veya vars
 echo -e "${SARI}(Buradan alabilirsiniz: https://console.chainstack.com/user/login)${RESET}"
 read -r CONSENSUS_URL
 if [ -z "$CONSENSUS_URL" ]; then
-    CONSENSUS_URL="https://ethereum-sepolia-beacon-chain.publicnode.com"
+    CONSENSUS_URL="https://eth-beacon-chain.drpc.org/rest/"
     echo -e "${SARI}Varsayılan Consensus URL kullanılıyor: $CONSENSUS_URL${RESET}"
 fi
 
