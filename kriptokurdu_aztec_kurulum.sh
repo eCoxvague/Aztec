@@ -61,49 +61,28 @@ echo -e "${GREEN}Docker kurulumu tamamlandı.${NC}"
 # Aztec CLI yükle
 echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
 bash -i <(curl -s https://install.aztec.network)
+echo -e "${GREEN}Aztec CLI kurulumu tamamlandı.${NC}"
 
-# PATH güncelle ve hemen uygula
-echo -e "${YELLOW}PATH değişkenini güncelleniyor...${NC}"
+# Tam yol tanımlamaları
+AZTEC_BIN_DIR="/root/.aztec/bin"
+AZTEC_CMD="$AZTEC_BIN_DIR/aztec"
+AZTEC_UP_CMD="$AZTEC_BIN_DIR/aztec-up"
+
+# PATH'i güncelle
+echo -e "${YELLOW}PATH değişkeni güncelleniyor...${NC}"
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.profile
+source ~/.bashrc
 
-# PATH'i mevcut shell için güncelle
+# Geçici olarak PATH'i ayarla
 export PATH="$HOME/.aztec/bin:$PATH"
 
-# Kurulumu kontrol et
-echo -e "${YELLOW}Aztec CLI kurulumu kontrol ediliyor...${NC}"
-if [ -f "$HOME/.aztec/bin/aztec" ]; then
-  echo -e "${GREEN}Aztec CLI başarıyla kuruldu.${NC}"
-else
-  echo -e "${RED}Aztec CLI kurulumu başarısız oldu. Tam yolu kontrol ediniz.${NC}"
-  # Alternatif konum aramayı dene
-  AZTEC_PATH=$(find /root -name "aztec" -type f 2>/dev/null | head -n 1)
-  if [ -n "$AZTEC_PATH" ]; then
-    echo -e "${YELLOW}Aztec CLI burada bulundu: $AZTEC_PATH${NC}"
-    AZTEC_BIN_DIR=$(dirname "$AZTEC_PATH")
-    echo -e "${YELLOW}PATH değişkenini $AZTEC_BIN_DIR ile güncelleniyor...${NC}"
-    export PATH="$AZTEC_BIN_DIR:$PATH"
-    echo 'export PATH="'$AZTEC_BIN_DIR':$PATH"' >> ~/.bashrc
-    echo 'export PATH="'$AZTEC_BIN_DIR':$PATH"' >> ~/.profile
-  else
-    echo -e "${RED}Aztec CLI bulunamadı. Kurulum başarısız olabilir.${NC}"
-    echo -e "${YELLOW}Manuel olarak ilerlemeye devam ediliyor...${NC}"
-  fi
-fi
-
-# Doğrudan tam yolları kullanarak komutları çalıştır
-echo -e "${CYAN}Aztec CLI başlatılıyor...${NC}"
-if [ -f "$HOME/.aztec/bin/aztec" ]; then
-  $HOME/.aztec/bin/aztec
-else
-  echo -e "${RED}aztec komutu bulunamadı, atlanıyor...${NC}"
-fi
-
+# Aztec komutlarını çalıştır
 echo -e "${CYAN}Aztec alpha-testnet yükleniyor...${NC}"
-if [ -f "$HOME/.aztec/bin/aztec-up" ]; then
-  $HOME/.aztec/bin/aztec-up alpha-testnet
+if [ -f "$AZTEC_UP_CMD" ]; then
+  $AZTEC_UP_CMD alpha-testnet
 else
-  echo -e "${RED}aztec-up komutu bulunamadı, atlanıyor...${NC}"
+  echo -e "${RED}Aztec-up bulunamadı. Tam yolunu kontrol edin: $AZTEC_UP_CMD${NC}"
+  find / -name "aztec-up" -type f 2>/dev/null | head -n 1
 fi
 
 # Genel IP al
@@ -139,26 +118,57 @@ read -p "$(echo -e ${YELLOW}"🛰️ Ethereum Beacon Consensus RPC URL'nizi giri
 read -p "$(echo -e ${YELLOW}"📡 Kaydettiğiniz genel IP adresinizi girin: "${NC})" LOCAL_IP
 read -p "$(echo -e ${YELLOW}"🔑 Validator özel anahtarınızı girin: "${NC})" PRIVATE_KEY
 
-# Aztec node başlat
+# Variableleri hazırla
+export ETHEREUM_HOSTS=$RPC_URL
+export L1_CONSENSUS_HOST_URLS=$CONSENSUS_URL
+export VALIDATOR_PRIVATE_KEY=$PRIVATE_KEY
+export P2P_IP=$LOCAL_IP
+
+# Aztec node başlat (tam yolları kullanarak)
 echo -e "${GREEN}🚦 Aztec node başlatılıyor...${NC}"
-if [ -f "$HOME/.aztec/bin/aztec" ]; then
-  $HOME/.aztec/bin/aztec start \
-    --network alpha-testnet \
+if [ -f "$AZTEC_CMD" ]; then
+  # Tam yolla başlat
+  $AZTEC_CMD start --network alpha-testnet \
     --l1-rpc-urls "$RPC_URL" \
     --l1-consensus-host-urls "$CONSENSUS_URL" \
     --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+    --sequencer.coinbase "$COINBASE" \
     --p2p.p2pIp "$LOCAL_IP" \
     --p2p.maxTxPoolSize 1000000000 \
     --archiver \
     --node \
     --sequencer
 else
-  echo -e "${RED}❌ Aztec CLI bulunamadı. Kurulumu kontrol edin.${NC}"
-  echo -e "${YELLOW}Kurulum bilgileri:${NC}"
-  echo -e "${CYAN}Cüzdan: ${NC}$COINBASE"
-  echo -e "${CYAN}RPC URL: ${NC}$RPC_URL"
-  echo -e "${CYAN}Consensus URL: ${NC}$CONSENSUS_URL"
-  echo -e "${CYAN}IP Adresi: ${NC}$LOCAL_IP"
-  echo -e "${YELLOW}Aşağıdaki komutu manuel olarak PATH değişkeni belirlendikten sonra çalıştırmanız gerekebilir:${NC}"
-  echo -e "${GREEN}aztec start --network alpha-testnet --l1-rpc-urls \"$RPC_URL\" --l1-consensus-host-urls \"$CONSENSUS_URL\" --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" --p2p.p2pIp \"$LOCAL_IP\" --p2p.maxTxPoolSize 1000000000 --archiver --node --sequencer${NC}"
+  echo -e "${RED}❌ Aztec CLI bulunamadı. Sistem PATH değişkenlerini yenilemeye çalışıyoruz...${NC}"
+  
+  # PATH sorunlarına karşı alternatif yöntemler
+  echo -e "${YELLOW}Alternatif komutları deniyoruz...${NC}"
+  
+  # Docker ile doğrudan başlatma
+  echo -e "${YELLOW}Docker ile doğrudan başlatmayı deniyoruz...${NC}"
+  docker run --network host -v /root/aztec-data:/data aztecprotocol/aztec:latest start \
+    --network alpha-testnet \
+    --l1-rpc-urls "$RPC_URL" \
+    --l1-consensus-host-urls "$CONSENSUS_URL" \
+    --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+    --sequencer.coinbase "$COINBASE" \
+    --p2p.p2pIp "$LOCAL_IP" \
+    --p2p.maxTxPoolSize 1000000000 \
+    --archiver \
+    --node \
+    --sequencer
 fi
+
+echo -e "${GREEN}✅ Kurulum tamamlandı. Aşağıdaki bilgileri kaydedin:${NC}"
+echo -e "${CYAN}Cüzdan: ${NC}$COINBASE"
+echo -e "${CYAN}RPC URL: ${NC}$RPC_URL"
+echo -e "${CYAN}Consensus URL: ${NC}$CONSENSUS_URL"
+echo -e "${CYAN}IP Adresi: ${NC}$LOCAL_IP"
+
+echo -e "${YELLOW}Manuel komut (gerekirse):${NC}"
+echo -e "${GREEN}$AZTEC_CMD start --network alpha-testnet --l1-rpc-urls \"$RPC_URL\" --l1-consensus-host-urls \"$CONSENSUS_URL\" --sequencer.validatorPrivateKey \"$PRIVATE_KEY\" --sequencer.coinbase \"$COINBASE\" --p2p.p2pIp \"$LOCAL_IP\" --p2p.maxTxPoolSize 1000000000 --archiver --node --sequencer${NC}"
+
+echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
+echo -e "${YELLOW}   Validator olarak kaydolmak için aşağıdaki komutu kullanın:${NC}"
+echo -e "${GREEN}$AZTEC_CMD add-l1-validator --l1-rpc-urls \"$RPC_URL\" --private-key \"$PRIVATE_KEY\" --attester \"$(echo $COINBASE)\" --proposer-eoa \"$(echo $COINBASE)\" --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 --l1-chain-id 11155111${NC}"
+echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
