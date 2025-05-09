@@ -6,10 +6,6 @@
   <a href="https://ibb.co/TqwZkSB8"><img src="https://i.ibb.co/x82yD0Sj/Ads-z-tasar-m-19.png" alt="Ads-z-tasar-m-19" border="0"></a>
 </p>
 
-<p align="center">
-  <strong>KriptoKurdu ekibi tarafından hazırlanan Aztec Sequencer Node kurulum rehberi</strong>
-</p>
-
 ---
 
 ## 📚 İçindekiler
@@ -27,9 +23,9 @@
 
 ## 🔍 Giriş
 
-Aztec Ethereum üzerinde çalışan gizlilik odaklı bir L2 (Layer 2) çözümüdür. Bu rehber Aztec ağının altyapısına katkıda bulunmak isteyen kullanıcılar için sequencer node kurulumunu adım adım anlatmaktadır.
+Aztec, Ethereum üzerinde çalışan gizlilik odaklı bir L2 (Layer 2) çözümüdür. Bu rehber, Aztec ağının altyapısına katkıda bulunmak isteyen kullanıcılar için sequencer node kurulumunu adım adım anlatmaktadır.
 
-KriptoKurdu ekibi olarak topluluk üyelerimizin bu teknolojik gelişimlere kolay bir şekilde katılabilmesi için bu rehberi hazırladık. Bu rehberde sunduğumuz kurulum betikleri, süreci otomatikleştirerek herkesin kolayca node çalıştırabilmesini sağlar.
+KriptoKurdu ekibi olarak, topluluk üyelerimizin bu teknolojik gelişimlere kolay bir şekilde katılabilmesi için bu rehberi hazırladık. Bu rehberde sunduğumuz kurulum betikleri, süreci otomatikleştirerek herkesin kolayca node çalıştırabilmesini sağlar.
 
 ## 🛠 Gereksinimler
 
@@ -37,6 +33,7 @@ KriptoKurdu ekibi olarak topluluk üyelerimizin bu teknolojik gelişimlere kolay
 - **İşlemci:** 8 çekirdek (minimum)
 - **RAM:** 8GB (minimum), 16GB (önerilen)
 - **Depolama:** 100GB SSD (minimum)
+- **İnternet:** Stabil bir internet bağlantısı
 
 ### Yazılım Gereksinimleri
 - **İşletim Sistemi:** Ubuntu 20.04 LTS veya üzeri
@@ -50,10 +47,8 @@ KriptoKurdu ekibi olarak topluluk üyelerimizin bu teknolojik gelişimlere kolay
 
 ## 🔧 Kurulum Adımları
 
-### 1. VPS Kiralama
-Eğer kendi sunucunuz yoksa aşağıdaki VPS sağlayıcılardan birini tercih edebilirsiniz:
-
-Contabo 4.5€ yada 7€'luk paket işimize yarayacaktır. Tercihen rahat olmamız için 7€'luk paket idealdir.
+### 1. VPS Kiralama (Opsiyonel)
+Eğer kendi sunucunuz yoksa, aşağıdaki VPS sağlayıcılardan birini tercih edebilirsiniz:
 - [Contabo](https://contabo.com/en/vps/) - 4.5€/ay'dan başlayan fiyatlarla
 - [Hetzner](https://www.hetzner.com/cloud) - Avrupa ve ABD lokasyonları
 - [Digital Ocean](https://www.digitalocean.com/) - 8GB RAM Droplet önerilir
@@ -78,7 +73,7 @@ screen -S aztec
 ```
 
 ### 5. Otomatik Kurulum Betiğini Çalıştırma
-KriptoKurdu özel kurulum betiğini çalıştırın:
+KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
 ```
 curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
 ```
@@ -124,17 +119,18 @@ curl -s -X POST -H 'Content-Type: application/json' \
 http://localhost:8080 | jq -r ".result"
 ```
 
-Komut bir dizi veri döndürecektir bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
+Komut bir dizi veri döndürecektir, bu verileri Discord sunucusunda görevinizi almak için kullanabilirsiniz.
 
-🔐 Validator Olarak Kayıt
+## 🔐 Validator Olarak Kayıt
+
 Node'unuzu validator olarak kaydetmek için aşağıdaki adımları takip edin:
-1. Cüzdan Bilgilerinizi Hazırlayın
 
-SEPOLIA-RPC-URL: Sepolia ağı için bir RPC URL (Infura, Alchemy gibi sağlayıcılardan alabilirsiniz)
-CÜZDAN-ÖZEL-ANAHTARINIZ: Cüzdanınızın özel anahtarı (0x ile başlar)
-CÜZDAN-ADRESİNİZ: Cüzdanınızın adresi (0x ile başlar)
+### 1. Cüzdan Bilgilerinizi Hazırlayın
+- `SEPOLIA-RPC-URL`: Sepolia ağı için bir RPC URL (Infura, Alchemy gibi sağlayıcılardan alabilirsiniz)
+- `CÜZDAN-ÖZEL-ANAHTARINIZ`: Cüzdanınızın özel anahtarı (0x ile başlar)
+- `CÜZDAN-ADRESİNİZ`: Cüzdanınızın adresi (0x ile başlar)
 
-2. Validator Kayıt Komutunu Çalıştırın
+### 2. Validator Kayıt Komutunu Çalıştırın
 ```
 aztec add-l1-validator \
   --l1-rpc-urls SEPOLIA-RPC-URL \
@@ -144,47 +140,69 @@ aztec add-l1-validator \
   --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \
   --l1-chain-id 11155111
 ```
-4. Doğrulama Durumunuzu Kontrol Edin
-Discord sunucusuna bağlanın ve /operator start komutunu girin. Discord botu size validator rolü verecek ve yönergeler sunacaktır.
-Not: Eğer "ValidatorQuotaFilledUntil" hatası alırsanız, bu günlük validator kotasının dolduğu anlamına gelir. UTC 01:00'den sonra tekrar deneyin.
 
-🔄 Güncelleme Talimatları
+### 3. Doğrulama Durumunuzu Kontrol Edin
+Discord sunucusuna bağlanın ve `/operator start` komutunu girin. Discord botu size validator rolü verecek ve yönergeler sunacaktır.
+
+**Not:** Eğer "ValidatorQuotaFilledUntil" hatası alırsanız, bu günlük validator kotasının dolduğu anlamına gelir. UTC 01:00'den sonra tekrar deneyin.
+
+## 🔄 Güncelleme Talimatları
+
 Aztec protokolü güncellendiğinde node'unuzu güncellemek için aşağıdaki adımları takip edin:
-1. Güncelleme Betiğini İndirin ve Çalıştırın
+
+### 1. Güncelleme Betiğini İndirin ve Çalıştırın
 ```
 curl -O https://raw.githubusercontent.com/KriptoKurdu/Aztec/main/kriptokurdu_aztec_guncelleme.sh && chmod +x kriptokurdu_aztec_guncelleme.sh && ./kriptokurdu_aztec_guncelleme.sh
 ```
+
 Güncelleme betiği:
+- Mevcut node'u durduracak
+- Yazılımı güncelleyecek
+- Eski verileri temizleyecek
+- Node'u yeniden başlatacak
 
-Mevcut node'u durduracak
-Yazılımı güncelleyecek
-Eski verileri temizleyecek
-Node'u yeniden başlatacak
-
-2. Güncelleme Sonrası Doğrulama
+### 2. Güncelleme Sonrası Doğrulama
 Güncelleme tamamlandıktan sonra, node'un düzgün çalıştığından emin olmak için logları kontrol edin:
 ```
 sudo docker logs -f $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
 ```
-❓ Sık Sorulan Sorular
-Node için ne kadar ödül alacağım?
-Aztec validator node operatörlerine ağın mainnet lansmanı sonrasında teşvikler sunmayı planlıyor. Ayrıntılar için resmi duyuruları takip edin.
-Node'um çalışmayı durdurdu ne yapmalıyım?
-İlk olarak logları kontrol edin. Sorun devam ederse node'u güncelleme betiğimizi kullanarak güncelleyin.
-Doğrulama için neden Sepolia ağını kullanıyoruz?
-Sepolia Aztec'in test ağı entegrasyonu için seçtiği Ethereum test ağıdır. Mainnet lansmanı öncesinde testler bu ağda yapılacaktır.
-Özel anahtar paylaşmak güvenli mi?
+
+## ❓ Sık Sorulan Sorular
+
+### Node için ne kadar ödül alacağım?
+Aztec, validator node operatörlerine ağın mainnet lansmanı sonrasında teşvikler sunmayı planlıyor. Ayrıntılar için resmi duyuruları takip edin.
+
+### Node'um çalışmayı durdurdu, ne yapmalıyım?
+İlk olarak logları kontrol edin. Sorun devam ederse, node'u güncelleme betiğimizi kullanarak güncelleyin.
+
+### Doğrulama için neden Sepolia ağını kullanıyoruz?
+Sepolia, Aztec'in test ağı entegrasyonu için seçtiği Ethereum test ağıdır. Mainnet lansmanı öncesinde testler bu ağda yapılacaktır.
+
+### Özel anahtar paylaşmak güvenli mi?
 Özel anahtarınızı sadece kendi VPS'inizde kullanın ve asla başkalarıyla paylaşmayın. Güvenlik için test amaçlı yeni bir cüzdan oluşturmanızı öneririz.
-Node'um senkronize olmuyorsa ne yapmalıyım?
+
+### Node'um senkronize olmuyorsa ne yapmalıyım?
 Senkronizasyon sorunları genellikle ağ bağlantısı veya donanım kısıtlamaları nedeniyle oluşur. Sunucunuzun gereksinimleri karşıladığından emin olun ve internet bağlantınızı kontrol edin.
 
-📱 İletişim
+## 📱 İletişim
+
 KriptoKurdu ekibi olarak sorularınızı yanıtlamaktan ve size yardımcı olmaktan memnuniyet duyarız:
 
-Telegram: [KriptoKurdu Telegram](https://t.me/kriptokurdugrup)
-Twitter: @KriptoKurduu
-Website: kriptokurdu.com
+- **Discord:** [KriptoKurdu Discord](https://discord.gg/kriptokurdu)
+- **Telegram:** [KriptoKurdu Telegram](https://t.me/kriptokurdu)
+- **Twitter:** [@KriptoKurdu](https://twitter.com/KriptoKurdu)
+- **Website:** [kriptokurdu.com](https://kriptokurdu.com)
+
+## 📄 Lisans
+
+Bu rehber ve betikler MIT Lisansı altında dağıtılmaktadır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
+
+---
 
 <p align="center">
-  <strong>KriptoKurdu tarafından ❤️ ile hazırlanmıştır.</strong>
+  <strong>KriptoKurdu Topluluğu tarafından ❤️ ile hazırlanmıştır.</strong>
+</p>
+
+<p align="center">
+  <img src="https://i.ibb.co/ZfCZrSQ/kriptokurdu-logo.png" alt="KriptoKurdu Logo" width="100"/>
 </p>
