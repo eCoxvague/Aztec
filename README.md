@@ -80,7 +80,7 @@ sudo apt install screen
 ### 5. Otomatik Kurulum Betiğini Çalıştırma
 KriptoKurdu özel kurulum betiğini indirin ve çalıştırın:
 ```
-sudo su curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh
+sudo su -c 'curl -O https://raw.githubusercontent.com/eCoxvague/Aztec/main/kriptokurdu_aztec_kurulum.sh && chmod +x kriptokurdu_aztec_kurulum.sh && ./kriptokurdu_aztec_kurulum.sh'
 ```
 
 Kurulum betiği otomatik olarak:
