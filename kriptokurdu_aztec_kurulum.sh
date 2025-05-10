@@ -62,25 +62,92 @@ function install_docker() {
     fi
 }
 
+# Node.js ve Yarn kurulumu 
+function install_nodejs() {
+    echo -e "${TURKUAZ}Node.js kontrol ediliyor...${RESET}"
+    
+    if ! command -v node &> /dev/null; then
+        echo -e "${TURKUAZ}Node.js kuruluyor...${RESET}"
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt-get install -y nodejs
+        
+        echo -e "${YESIL}✓ Node.js kuruldu${RESET}"
+    else
+        echo -e "${YESIL}✓ Node.js zaten kurulu${RESET}"
+    fi
+    
+    # Yarn kurulumu
+    if ! command -v yarn &> /dev/null; then
+        echo -e "${TURKUAZ}Yarn kuruluyor...${RESET}"
+        npm install -g yarn
+        echo -e "${YESIL}✓ Yarn kuruldu${RESET}"
+    else
+        echo -e "${YESIL}✓ Yarn zaten kurulu${RESET}"
+    fi
+}
+
 # Aztec araçlarını kur
 function install_aztec() {
     echo -e "${TURKUAZ}Aztec araçları kuruluyor...${RESET}"
     
-    # Aztec araçlarını indir
+    # Gerekli dizinleri oluştur
+    mkdir -p $HOME/.aztec
+    
+    # Aztec'in kurulum sonrası PATH'e eklenmesi için .bashrc'ye ekleyelim
+    echo 'export PATH=$PATH:$HOME/.yarn/bin' >> $HOME/.bashrc
+    export PATH=$PATH:$HOME/.yarn/bin
+    
+    # Aztec installer'ı indir ve çalıştır
+    echo -e "${TURKUAZ}Aztec installer indiriliyor...${RESET}"
     bash -i <(curl -s https://install.aztec.network)
     
-    # PATH'i güncelleyelim
-    source ~/.bashrc || source ~/.bash_profile || true
+    # Aztec komutunu bul (önceki kurulumdan)
+    AZTEC_PATHS=(
+        "$HOME/.yarn/bin/aztec"
+        "/usr/local/bin/aztec"
+        "$HOME/.local/bin/aztec"
+        "$(which aztec 2>/dev/null || echo "")"
+    )
     
-    # Aztec'in kurulduğu yerini bul ve kaydet
-    AZTEC_PATH=$(which aztec 2>/dev/null || echo "/root/.yarn/bin/aztec")
-    echo "Aztec komutu: $AZTEC_PATH"
+    # Kullanılabilir aztec komutunu bul
+    AZTEC_PATH=""
+    for path in "${AZTEC_PATHS[@]}"; do
+        if [[ -x "$path" ]]; then
+            AZTEC_PATH="$path"
+            break
+        fi
+    done
+    
+    # Eğer komut hala bulunamadıysa, tüm sistem genelinde ara
+    if [[ -z "$AZTEC_PATH" ]]; then
+        echo -e "${TURKUAZ}Aztec komutu aranıyor...${RESET}"
+        AZTEC_PATH=$(find / -type f -name "aztec" -executable 2>/dev/null | head -n 1)
+    fi
+    
+    # Komut bulunamadıysa
+    if [[ -z "$AZTEC_PATH" ]]; then
+        echo -e "${SARI}⚠️ Aztec komutu bulunamadı. Manual kurulum deneniyor...${RESET}"
+        
+        # Yarn global ile kurmayı dene
+        yarn global add @aztec/cli
+        
+        # Tekrar kontrol et
+        AZTEC_PATH=$(find / -type f -name "aztec" -executable 2>/dev/null | head -n 1)
+        
+        if [[ -z "$AZTEC_PATH" ]]; then
+            echo -e "${KIRMIZI}✗ Aztec komutu kurulamadı ve bulunamadı.${RESET}"
+            exit 1
+        fi
+    fi
+    
+    echo -e "${YESIL}✓ Aztec komutu bulundu: $AZTEC_PATH${RESET}"
+    
+    # Aztec'in konumunu yapılandırma dosyasına kaydet
+    echo "AZTEC_PATH=\"$AZTEC_PATH\"" > $HOME/.aztec/aztec_path
     
     # Alpha-testnet sürümünü yükle
-    $AZTEC_PATH-up alpha-testnet || ~/.yarn/bin/aztec-up alpha-testnet
-    
-    # Aztec konumunu kaydet
-    echo "AZTEC_PATH=$AZTEC_PATH" > $HOME/.aztec/aztec_path
+    echo -e "${TURKUAZ}Alpha-testnet sürümünü yükleniyor...${RESET}"
+    "$AZTEC_PATH-up" alpha-testnet || "$HOME/.yarn/bin/aztec-up" alpha-testnet
     
     echo -e "${YESIL}✓ Aztec araçları kuruldu${RESET}"
 }
@@ -88,6 +155,13 @@ function install_aztec() {
 # Yapılandırma değişkenlerini topla
 function collect_config() {
     echo -e "${TURKUAZ}Node yapılandırma bilgileri toplanıyor...${RESET}"
+    
+    # Yapılandırma dizini
+    mkdir -p $HOME/.aztec
+    CONFIG_FILE="$HOME/.aztec/node_config.env"
+    
+    # Aztec komut dosyasının konumunu al
+    AZTEC_PATH=$(cat $HOME/.aztec/aztec_path | grep AZTEC_PATH | cut -d'"' -f2)
     
     # Ethereum RPC URL
     echo -e "${BEYAZ}Ethereum RPC URL'lerini girin (virgülle ayrılmış):${RESET}"
@@ -118,32 +192,31 @@ function collect_config() {
         read -p "> " P2P_IP
     fi
     
-    # Yapılandırma klasörü ve dosyası
-    mkdir -p $HOME/.aztec
-    CONFIG_FILE="$HOME/.aztec/node_config.env"
-    
     # Yapılandırma dosyasını oluştur
     cat > $CONFIG_FILE << EOL
 # KriptoKurdu Aztec Node Yapılandırması
 # Oluşturulma: $(date)
 
+# Aztec komutunun tam yolu
+AZTEC_PATH="$AZTEC_PATH"
+
 # Ethereum RPC URL'leri
-ETHEREUM_HOSTS=$ETHEREUM_HOSTS
+ETHEREUM_HOSTS="$ETHEREUM_HOSTS"
 
 # L1 Consensus Host URL'leri
-L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
+L1_CONSENSUS_HOST_URLS="$L1_CONSENSUS_HOST_URLS"
 
 # Validator Özel Anahtarı
-VALIDATOR_PRIVATE_KEY=$VALIDATOR_PRIVATE_KEY
+VALIDATOR_PRIVATE_KEY="$VALIDATOR_PRIVATE_KEY"
 
 # Blok ödülleri için adres
-COINBASE=$COINBASE
+COINBASE="$COINBASE"
 
 # P2P IP adresi
-P2P_IP=$P2P_IP
+P2P_IP="$P2P_IP"
 
 # P2P port (varsayılan)
-P2P_PORT=40400
+P2P_PORT="40400"
 EOL
 
     echo -e "${YESIL}✓ Yapılandırma dosyası oluşturuldu: $CONFIG_FILE${RESET}"
@@ -162,18 +235,34 @@ function create_startup_scripts() {
     cat > $START_SCRIPT << EOL
 #!/bin/bash
 
-# PATH'e Aztec komutunu ekleyin
-export PATH=/usr/local/bin:$HOME/.local/bin:$HOME/.yarn/bin:$PATH
-
 # Yapılandırma dosyasını yükle
 source $HOME/.aztec/node_config.env
 
-# Aztec'in nerede olduğunu bul
-AZTEC_PATH=\$(which aztec)
-echo "Kullanılan Aztec: \$AZTEC_PATH"
+echo "Aztec komutu kullanılıyor: \$AZTEC_PATH"
+
+# Komutun mevcut olup olmadığını kontrol et
+if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
+    echo "Hata: Aztec komutu bulunamadı veya çalıştırılamıyor: \$AZTEC_PATH"
+    echo "Alternatif komutlar aranıyor..."
+    
+    # Alternatif yolları kontrol et
+    for alt_path in "$HOME/.yarn/bin/aztec" "/usr/local/bin/aztec" "$HOME/.local/bin/aztec" "\$(which aztec 2>/dev/null)"; do
+        if [ -f "\$alt_path" ] && [ -x "\$alt_path" ]; then
+            echo "Alternatif Aztec komutu bulundu: \$alt_path"
+            AZTEC_PATH="\$alt_path"
+            break
+        fi
+    done
+    
+    # Hala bulunamadıysa, hata ver ve çık
+    if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
+        echo "Kritik hata: Hiçbir çalıştırılabilir Aztec komutu bulunamadı."
+        exit 1
+    fi
+fi
 
 # Node'u başlat
-\$AZTEC_PATH start --node --archiver --sequencer \\
+"\$AZTEC_PATH" start --node --archiver --sequencer \\
   --network alpha-testnet \\
   --l1-rpc-urls \$ETHEREUM_HOSTS \\
   --l1-consensus-host-urls \$L1_CONSENSUS_HOST_URLS \\
@@ -190,28 +279,44 @@ EOL
     cat > $VALIDATOR_SCRIPT << EOL
 #!/bin/bash
 
-# PATH'e Aztec komutunu ekleyin
-export PATH=/usr/local/bin:$HOME/.local/bin:$HOME/.yarn/bin:$PATH
-
 # Yapılandırma dosyasını yükle
 source $HOME/.aztec/node_config.env
 
-# Aztec'in nerede olduğunu bul
-AZTEC_PATH=\$(which aztec)
-echo "Kullanılan Aztec: \$AZTEC_PATH"
+echo "Aztec komutu kullanılıyor: \$AZTEC_PATH"
+
+# Komutun mevcut olup olmadığını kontrol et
+if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
+    echo "Hata: Aztec komutu bulunamadı veya çalıştırılamıyor: \$AZTEC_PATH"
+    echo "Alternatif komutlar aranıyor..."
+    
+    # Alternatif yolları kontrol et
+    for alt_path in "$HOME/.yarn/bin/aztec" "/usr/local/bin/aztec" "$HOME/.local/bin/aztec" "\$(which aztec 2>/dev/null)"; do
+        if [ -f "\$alt_path" ] && [ -x "\$alt_path" ]; then
+            echo "Alternatif Aztec komutu bulundu: \$alt_path"
+            AZTEC_PATH="\$alt_path"
+            break
+        fi
+    done
+    
+    # Hala bulunamadıysa, hata ver ve çık
+    if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
+        echo "Kritik hata: Hiçbir çalıştırılabilir Aztec komutu bulunamadı."
+        exit 1
+    fi
+fi
 
 # Validator özel anahtarından Ethereum adresini türet
-NODE_ADDRESS=\$(\$AZTEC_PATH address-from-private-key --private-key \$VALIDATOR_PRIVATE_KEY)
+NODE_ADDRESS=\$("\$AZTEC_PATH" address-from-private-key --private-key "\$VALIDATOR_PRIVATE_KEY")
 
 echo "Validator olarak kaydediliyor..."
 echo "Node adresi: \$NODE_ADDRESS"
 
 # Validator olarak kaydet
-\$AZTEC_PATH add-l1-validator \\
-  --l1-rpc-urls \$ETHEREUM_HOSTS \\
-  --private-key \$VALIDATOR_PRIVATE_KEY \\
-  --attester \$NODE_ADDRESS \\
-  --proposer-eoa \$NODE_ADDRESS \\
+"\$AZTEC_PATH" add-l1-validator \\
+  --l1-rpc-urls "\$ETHEREUM_HOSTS" \\
+  --private-key "\$VALIDATOR_PRIVATE_KEY" \\
+  --attester "\$NODE_ADDRESS" \\
+  --proposer-eoa "\$NODE_ADDRESS" \\
   --staking-asset-handler 0xF739D03e98e23A7B65940848aBA8921fF3bAc4b2 \\
   --l1-chain-id 11155111
 
@@ -233,9 +338,11 @@ Description=Aztec Sequencer Node
 After=network.target
 
 [Service]
+Type=simple
 User=$USER
-ExecStart=$START_SCRIPT
-Environment="PATH=/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin:$HOME/.yarn/bin"
+WorkingDirectory=/root
+ExecStart=/bin/bash $START_SCRIPT
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/root/.yarn/bin:/root/.local/bin"
 Restart=always
 RestartSec=10
 LimitNOFILE=65535
@@ -250,6 +357,96 @@ EOL
     
     echo -e "${YESIL}✓ Başlatma betikleri oluşturuldu${RESET}"
     echo -e "${YESIL}✓ Aztec node servisi oluşturuldu ve etkinleştirildi${RESET}"
+}
+
+# Komutla node başlatma fonksiyonu
+function start_aztec_node() {
+    echo -e "${TURKUAZ}Aztec node başlatılıyor...${RESET}"
+    
+    # Servisi başlat
+    systemctl start aztec-node
+    sleep 2
+    
+    # Durumu kontrol et
+    NODE_STATUS=$(systemctl is-active aztec-node)
+    
+    if [ "$NODE_STATUS" = "active" ]; then
+        echo -e "${YESIL}✓ Aztec node başarıyla başlatıldı${RESET}"
+    else
+        echo -e "${SARI}⚠️ Aztec node başlatılamadı, servis durumu: $NODE_STATUS${RESET}"
+        echo -e "${TURKUAZ}Loglara bakılıyor...${RESET}"
+        
+        # Logları göster
+        journalctl -u aztec-node -n 20 --no-pager
+        
+        echo -e "${KIRMIZI}Node başlatılamadı. Lütfen manuel olarak kontrol edin: ${RESET}"
+        echo -e "${SARI}   sudo journalctl -u aztec-node -f${RESET}"
+    fi
+}
+
+# Manuel node başlatma komutu oluşturma
+function create_manual_start() {
+    echo -e "${TURKUAZ}Manuel başlatma komutu oluşturuluyor...${RESET}"
+    
+    # Yapılandırma dosyasını yükle
+    CONFIG_FILE="$HOME/.aztec/node_config.env"
+    source $CONFIG_FILE
+    
+    # Manuel başlatma betiği
+    MANUAL_SCRIPT="$HOME/.aztec/manual-start.sh"
+    cat > $MANUAL_SCRIPT << EOL
+#!/bin/bash
+
+# KriptoKurdu Aztec Node - Manuel Başlatma Betiği
+# Bu betik, sistemd servisi başarısız olursa kullanılabilir
+
+# PATH'i ayarla
+export PATH=\$PATH:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/root/.yarn/bin:/root/.local/bin
+
+# Yapılandırma dosyasını yükle
+source $HOME/.aztec/node_config.env
+
+echo "Aztec komutu için olası konumlar taranıyor..."
+
+# Tüm olası Aztec konumlarını tara
+POSSIBLE_PATHS=(
+    "/root/.yarn/bin/aztec"
+    "/usr/local/bin/aztec"
+    "\$HOME/.local/bin/aztec"
+    "\$(which aztec 2>/dev/null)"
+    "\$(find / -type f -name aztec -executable 2>/dev/null | head -n 1)"
+)
+
+# Her bir olası konumu test et
+for cmd in "\${POSSIBLE_PATHS[@]}"; do
+    if [ -f "\$cmd" ] && [ -x "\$cmd" ]; then
+        echo "Çalıştırılabilir Aztec komutu bulundu: \$cmd"
+        
+        echo "Node başlatılıyor: \$cmd start --node --archiver --sequencer ..."
+        
+        # Node'u başlat
+        "\$cmd" start --node --archiver --sequencer \\
+          --network alpha-testnet \\
+          --l1-rpc-urls "\$ETHEREUM_HOSTS" \\
+          --l1-consensus-host-urls "\$L1_CONSENSUS_HOST_URLS" \\
+          --sequencer.validatorPrivateKey "\$VALIDATOR_PRIVATE_KEY" \\
+          --sequencer.coinbase "\$COINBASE" \\
+          --p2p.p2pIp "\$P2P_IP" \\
+          --p2p.p2pPort "\$P2P_PORT" \\
+          --p2p.maxTxPoolSize 1000000000
+          
+        # Başarılıysa döngüden çık
+        if [ \$? -eq 0 ]; then
+            exit 0
+        fi
+    fi
+done
+
+echo "Hiçbir Aztec komutu çalıştırılamadı."
+EOL
+    chmod +x $MANUAL_SCRIPT
+    
+    echo -e "${YESIL}✓ Manuel başlatma betiği oluşturuldu: $MANUAL_SCRIPT${RESET}"
 }
 
 # Port yönlendirme uyarısı
@@ -281,12 +478,13 @@ function success_message() {
     echo "Betikler şu konumda oluşturuldu:"
     echo "• Node başlatma: $HOME/.aztec/start-node.sh"
     echo "• Validator kayıt: $HOME/.aztec/register-validator.sh"
+    echo "• Manuel başlatma: $HOME/.aztec/manual-start.sh (sorun durumunda)"
     echo ""
-    echo "Node'u başlatmak için:"
-    echo "   sudo systemctl start aztec-node"
-    echo ""
-    echo "Node durumunu kontrol etmek için:"
+    echo "Node şu anda çalışıyor olmalı. Kontrol etmek için:"
     echo "   sudo systemctl status aztec-node"
+    echo ""
+    echo "Eğer node çalışmıyorsa, manuel başlatmayı deneyebilirsiniz:"
+    echo "   $HOME/.aztec/manual-start.sh"
     echo ""
     echo "Validator olarak kaydolmak için önce node'unuzun tam olarak"
     echo "senkronize olmasını bekleyin, ardından şu komutu çalıştırın:"
@@ -304,9 +502,12 @@ function main() {
     logo
     prepare_system
     install_docker
+    install_nodejs
     install_aztec
     collect_config
     create_startup_scripts
+    create_manual_start
+    start_aztec_node
     port_forwarding_warning
     success_message
 }
