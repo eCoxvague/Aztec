@@ -246,7 +246,7 @@ if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
     echo "Alternatif komutlar aranıyor..."
     
     # Alternatif yolları kontrol et
-    for alt_path in "$HOME/.yarn/bin/aztec" "/usr/local/bin/aztec" "$HOME/.local/bin/aztec" "\$(which aztec 2>/dev/null)"; do
+    for alt_path in "$HOME/.yarn/bin/aztec" "/usr/local/bin/aztec" "$HOME/.local/bin/aztec" "$HOME/.aztec/bin/aztec" "\$(which aztec 2>/dev/null)"; do
         if [ -f "\$alt_path" ] && [ -x "\$alt_path" ]; then
             echo "Alternatif Aztec komutu bulundu: \$alt_path"
             AZTEC_PATH="\$alt_path"
@@ -261,16 +261,31 @@ if [ ! -f "\$AZTEC_PATH" ] || [ ! -x "\$AZTEC_PATH" ]; then
     fi
 fi
 
+# Swap kontrolü ve gerekirse oluşturma
+if [ ! -f "/swapfile" ]; then
+    echo "Swap alanı oluşturuluyor..."
+    fallocate -l 4G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    echo "Swap alanı oluşturuldu: 4GB"
+fi
+
+# Snapshot dizini oluştur
+mkdir -p /root/.aztec/fixed-snapshot
+
 # Node'u başlat
 "\$AZTEC_PATH" start --node --archiver --sequencer \\
   --network alpha-testnet \\
-  --l1-rpc-urls \$ETHEREUM_HOSTS \\
-  --l1-consensus-host-urls \$L1_CONSENSUS_HOST_URLS \\
-  --sequencer.validatorPrivateKey \$VALIDATOR_PRIVATE_KEY \\
-  --sequencer.coinbase \$COINBASE \\
-  --p2p.p2pIp \$P2P_IP \\
-  --p2p.p2pPort \$P2P_PORT \\
-  --p2p.maxTxPoolSize 1000000000
+  --l1-rpc-urls "\$ETHEREUM_HOSTS" \\
+  --l1-consensus-host-urls "\$L1_CONSENSUS_HOST_URLS" \\
+  --sequencer.validatorPrivateKey "\$VALIDATOR_PRIVATE_KEY" \\
+  --sequencer.coinbase "\$COINBASE" \\
+  --p2p.p2pIp "\$P2P_IP" \\
+  --p2p.p2pPort "\$P2P_PORT" \\
+  --p2p.maxTxPoolSize 1000000000 \\
+  --node.snapshotsDir=/root/.aztec/fixed-snapshot
 EOL
     chmod +x $START_SCRIPT
     
@@ -341,11 +356,14 @@ After=network.target
 Type=simple
 User=$USER
 WorkingDirectory=/root
+Environment="DOCKER_OPTS=--memory=10g"
 ExecStart=/bin/bash $START_SCRIPT
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/root/.yarn/bin:/root/.local/bin"
 Restart=always
 RestartSec=10
 LimitNOFILE=65535
+LimitMEMLOCK=infinity
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
