@@ -69,8 +69,18 @@ function install_aztec() {
     # Aztec araçlarını indir
     bash -i <(curl -s https://install.aztec.network)
     
+    # PATH'i güncelleyelim
+    source ~/.bashrc || source ~/.bash_profile || true
+    
+    # Aztec'in kurulduğu yerini bul ve kaydet
+    AZTEC_PATH=$(which aztec 2>/dev/null || echo "/root/.yarn/bin/aztec")
+    echo "Aztec komutu: $AZTEC_PATH"
+    
     # Alpha-testnet sürümünü yükle
-    aztec-up alpha-testnet
+    $AZTEC_PATH-up alpha-testnet || ~/.yarn/bin/aztec-up alpha-testnet
+    
+    # Aztec konumunu kaydet
+    echo "AZTEC_PATH=$AZTEC_PATH" > $HOME/.aztec/aztec_path
     
     echo -e "${YESIL}✓ Aztec araçları kuruldu${RESET}"
 }
@@ -152,11 +162,18 @@ function create_startup_scripts() {
     cat > $START_SCRIPT << EOL
 #!/bin/bash
 
+# PATH'e Aztec komutunu ekleyin
+export PATH=/usr/local/bin:$HOME/.local/bin:$HOME/.yarn/bin:$PATH
+
 # Yapılandırma dosyasını yükle
 source $HOME/.aztec/node_config.env
 
+# Aztec'in nerede olduğunu bul
+AZTEC_PATH=\$(which aztec)
+echo "Kullanılan Aztec: \$AZTEC_PATH"
+
 # Node'u başlat
-aztec start --node --archiver --sequencer \\
+\$AZTEC_PATH start --node --archiver --sequencer \\
   --network alpha-testnet \\
   --l1-rpc-urls \$ETHEREUM_HOSTS \\
   --l1-consensus-host-urls \$L1_CONSENSUS_HOST_URLS \\
@@ -173,17 +190,24 @@ EOL
     cat > $VALIDATOR_SCRIPT << EOL
 #!/bin/bash
 
+# PATH'e Aztec komutunu ekleyin
+export PATH=/usr/local/bin:$HOME/.local/bin:$HOME/.yarn/bin:$PATH
+
 # Yapılandırma dosyasını yükle
 source $HOME/.aztec/node_config.env
 
+# Aztec'in nerede olduğunu bul
+AZTEC_PATH=\$(which aztec)
+echo "Kullanılan Aztec: \$AZTEC_PATH"
+
 # Validator özel anahtarından Ethereum adresini türet
-NODE_ADDRESS=\$(aztec address-from-private-key --private-key \$VALIDATOR_PRIVATE_KEY)
+NODE_ADDRESS=\$(\$AZTEC_PATH address-from-private-key --private-key \$VALIDATOR_PRIVATE_KEY)
 
 echo "Validator olarak kaydediliyor..."
 echo "Node adresi: \$NODE_ADDRESS"
 
 # Validator olarak kaydet
-aztec add-l1-validator \\
+\$AZTEC_PATH add-l1-validator \\
   --l1-rpc-urls \$ETHEREUM_HOSTS \\
   --private-key \$VALIDATOR_PRIVATE_KEY \\
   --attester \$NODE_ADDRESS \\
@@ -211,6 +235,7 @@ After=network.target
 [Service]
 User=$USER
 ExecStart=$START_SCRIPT
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin:$HOME/.yarn/bin"
 Restart=always
 RestartSec=10
 LimitNOFILE=65535
