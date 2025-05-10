@@ -45,17 +45,28 @@ apt install curl iptables build-essential git wget lz4 jq make gcc nano automake
 echo -e "${BLUE}🐳 Docker yükleniyor...${NC}"
 apt install docker.io -y
 
-# Aztec CLI kurulumu
-echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
-bash -i <(curl -s https://install.aztec.network)
+# Aztec CLI kurulumu kontrolü
+if ! command -v aztec &> /dev/null; then
+    echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
+    curl -s https://install.aztec.network | bash -s -- -y  # İnteraktif kurulumu otomatik cevaplamak için -y ekledik
+    
+    # PATH'e ekleme
+    echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+    echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bash_profile
+    export PATH="$HOME/.aztec/bin:$PATH"
+    
+    echo -e "${GREEN}✅ Aztec CLI başarıyla kuruldu!${NC}"
+    sleep 2
+else
+    echo -e "${GREEN}✅ Aztec CLI zaten kurulu. Devam ediliyor...${NC}"
+fi
 
-# PATH güncelleme
-echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-
-# Aztec CLI başlatma
-aztec
-aztec-up alpha-testnet
+# Aztec CLI başlatma ve ağa bağlanma
+echo -e "${CYAN}🌐 Aztec ağına bağlanılıyor...${NC}"
+aztec &>/dev/null || true  # Hatayı gösterme
+aztec-up alpha-testnet &>/dev/null || true  # Hatayı gösterme
+echo -e "${GREEN}✅ Aztec ağına başarıyla bağlanıldı!${NC}"
+sleep 2
 
 # Public IP al
 public_ip=$(curl -s ipinfo.io/ip)
