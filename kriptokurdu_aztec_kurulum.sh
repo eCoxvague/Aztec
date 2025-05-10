@@ -1,94 +1,102 @@
 #!/bin/bash
-
 clear
+# Banner renkli
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+PURPLE='\033[0;35m'
+NC='\033[0m' # No Color
 
+# KriptoKurdu Banner
+echo -e "${CYAN}"
 cat << "EOF"
-
-
 ╔════════════════════════════════════════════════════════════╗                                                 
                     K R İ P T O K U R D U 
                      A Z T E C  N O D E
-
              Twitter:  https://x.com/kriptokurduu
-             Telegram: https://t.me/vampsairdrop
+             Telegram: https://t.me/kriptokurdugrup
 ╚════════════════════════════════════════════════════════════╝
-
 EOF
+echo -e "${NC}"
+sleep 5
+echo -e "${CYAN}KriptoKurdu Aztec Node Kurulum Aracına Hoş Geldiniz!${NC}"
+sleep 2
 
-sleep 3
-
-# Root kontrolü
+# Root olarak çalıştır
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Lütfen bu betiği root olarak çalıştırın: sudo su"
+  echo -e "${RED}❌ Lütfen bu scripti root olarak çalıştırın: sudo su${NC}"
   exit 1
 fi
 
-# Ana dizine geç
+# Ana dizine git
 cd
 
-# PATH güncellemesi (önceden eksikti!)
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.aztec/bin"
-
-# Sistem güncellemesi
-echo "📦 Sistem paketleri güncelleniyor..."
+# Sistem güncelleme
+echo -e "${YELLOW}📦 Sistem güncelleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 
-# Bağımlılıkların kurulumu
-echo "📚 Gerekli bağımlılıklar yükleniyor..."
+# Bağımlılıkları yükle
+echo -e "${GREEN}📚 Gerekli bağımlılıklar yükleniyor...${NC}"
 apt install curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev -y
 
 # Docker kurulumu
-echo "🐳 Docker kuruluyor..."
+echo -e "${BLUE}🐳 Docker yükleniyor...${NC}"
 apt install docker.io -y
 
 # Aztec CLI kurulumu
-echo "🚀 Aztec CLI kuruluyor..."
-curl -s https://install.aztec.network | bash
+echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
+bash -i <(curl -s https://install.aztec.network)
 
-# PATH'i kalıcı hale getir
+# PATH güncelleme
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
-export PATH="$HOME/.aztec/bin:$PATH"
 
-# Aztec CLI başlat
+# Aztec CLI başlatma
 aztec
 aztec-up alpha-testnet
 
-# IP tespiti
+# Public IP al
 public_ip=$(curl -s ipinfo.io/ip)
-echo "🌐 Tespit edilen IP adresiniz: $public_ip"
-echo "⚠️  Devam etmeden önce bu IP adresini kaydettiğinizden emin olun."
-read -p "Kaydettiniz mi? (y/n): " saved
-if [ "$saved" != "y" ]; then
-  echo "❗ Lütfen IP adresini kaydedin ve scripti tekrar çalıştırın."
+echo -e "${YELLOW}🌐 Tespit edilen public IP: ${GREEN}$public_ip${NC}"
+echo -e "${RED}⚠️  Lütfen devam etmeden önce bu IP adresini kaydedin.${NC}"
+read -p "Kaydettin mi? (e/h): " saved
+if [ "$saved" != "e" ]; then
+  echo -e "${RED}❗ IP adresini kaydedin ve scripti tekrar çalıştırın.${NC}"
   exit 1
 fi
 
-# Güvenlik duvarı ayarı
-echo "🧱 Güvenlik duvarı ayarlanıyor..."
+# Güvenlik duvarı ayarları
+echo -e "${BLUE}🔒 Güvenlik duvarı yapılandırılıyor...${NC}"
 ufw allow ssh
 ufw allow 40400
 ufw allow 40500
 ufw allow 8080
 ufw --force enable
 
-# Cüzdan adresi gir
+# Cüzdan bilgisi
 read -p "🔐 EVM cüzdan adresinizi girin: " COINBASE
 
-# Ortam değişkenleri
-export DATA_DIRECTORY=/root/aztec-data/
+# Ortam değişkenlerini ayarla
+export DATA_DIRECTORY=/root/aztec-kurdu-data/
 export COINBASE=$COINBASE
 export LOG_LEVEL=debug
 export P2P_MAX_TX_POOL_SIZE=1000000000
 
-# RPC ve validator bilgileri
-read -p "🌍 Ethereum Sepolia RPC URL’nizi girin: " RPC_URL
-read -p "🛰️  Ethereum Beacon Consensus RPC URL’nizi girin: " CONSENSUS_URL
-read -p "📡 Kaydettiğiniz genel IP adresinizi tekrar girin: " LOCAL_IP
-read -p "🔑 Validator private key’inizi girin: " PRIVATE_KEY
+# RPC ve doğrulayıcı bilgileri
+echo -e "${GREEN}Şimdi gerekli RPC ve doğrulayıcı bilgilerini gireceğiz${NC}"
+echo -e "${YELLOW}RPC URL'i https://dashboard.alchemy.com/apps/ adresinden alabilirsiniz${NC}"
+read -p "🌍 Ethereum Sepolia RPC URL'nizi girin: " RPC_URL
 
-# Node başlatma
-echo "🚦 Aztec node başlatılıyor..."
+echo -e "${YELLOW}Consensus URL'i https://console.chainstack.com/user/login adresinden alabilirsiniz${NC}"
+read -p "🛰️ Ethereum Beacon Consensus RPC URL'nizi girin: " CONSENSUS_URL
+
+read -p "📡 Kaydettiğiniz public IP adresinizi girin: " LOCAL_IP
+read -p "🔑 Doğrulayıcı özel anahtarınızı girin: " PRIVATE_KEY
+
+# Aztec node'unu başlat
+echo -e "${CYAN}🚦 KriptoKurdu Aztec node başlatılıyor...${NC}"
 aztec start \
   --network alpha-testnet \
   --l1-rpc-urls "$RPC_URL" \
@@ -99,3 +107,6 @@ aztec start \
   --archiver \
   --node \
   --sequencer
+
+echo -e "${GREEN}✅ KriptoKurdu Aztec Node başarıyla kuruldu ve çalışıyor!${NC}"
+echo -e "${YELLOW}Bu node hakkında sorularınız için Telegram grubuna katılın: https://t.me/kriptokurdugrup${NC}"
