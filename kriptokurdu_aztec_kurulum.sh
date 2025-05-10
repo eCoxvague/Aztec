@@ -1,6 +1,5 @@
 #!/bin/bash
-clear
-# Banner renkli
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -9,6 +8,7 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
+clear
 # KriptoKurdu Banner
 echo -e "${CYAN}"
 cat << "EOF"
@@ -20,7 +20,7 @@ cat << "EOF"
 ╚════════════════════════════════════════════════════════════╝
 EOF
 echo -e "${NC}"
-sleep 5
+
 echo -e "${CYAN}KriptoKurdu Aztec Node Kurulum Aracına Hoş Geldiniz!${NC}"
 sleep 2
 
@@ -33,40 +33,31 @@ fi
 # Ana dizine git
 cd
 
+# Kurulum tipi seçimi
+echo -e "${YELLOW}Kurulum tipini seçin:${NC}"
+echo -e "1) ${GREEN}Docker Tabanlı Kurulum${NC} (Önerilen)"
+echo -e "2) ${BLUE}CLI Tabanlı Kurulum${NC}"
+read -p "Seçiminiz (1/2): " INSTALL_TYPE
+
 # Sistem güncelleme
 echo -e "${YELLOW}📦 Sistem güncelleniyor...${NC}"
 apt-get update && apt-get upgrade -y
 
 # Bağımlılıkları yükle
 echo -e "${GREEN}📚 Gerekli bağımlılıklar yükleniyor...${NC}"
-apt install curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev -y
+apt install curl wget jq screen build-essential git lz4 make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip libleveldb-dev -y
 
 # Docker kurulumu
 echo -e "${BLUE}🐳 Docker yükleniyor...${NC}"
-apt install docker.io -y
-
-# Aztec CLI kurulumu kontrolü
-if ! command -v aztec &> /dev/null; then
-    echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
-    curl -s https://install.aztec.network | bash -s -- -y  # İnteraktif kurulumu otomatik cevaplamak için -y ekledik
-    
-    # PATH'e ekleme
-    echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-    echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bash_profile
-    export PATH="$HOME/.aztec/bin:$PATH"
-    
-    echo -e "${GREEN}✅ Aztec CLI başarıyla kuruldu!${NC}"
-    sleep 2
-else
-    echo -e "${GREEN}✅ Aztec CLI zaten kurulu. Devam ediliyor...${NC}"
+if ! command -v docker &> /dev/null; then
+  curl -fsSL https://get.docker.com -o get-docker.sh
+  sh get-docker.sh
+  rm get-docker.sh
+  systemctl enable docker
+  systemctl start docker
+else 
+  echo -e "${GREEN}✅ Docker zaten kurulu.${NC}"
 fi
-
-# Aztec CLI başlatma ve ağa bağlanma
-echo -e "${CYAN}🌐 Aztec ağına bağlanılıyor...${NC}"
-aztec &>/dev/null || true  # Hatayı gösterme
-aztec-up alpha-testnet &>/dev/null || true  # Hatayı gösterme
-echo -e "${GREEN}✅ Aztec ağına başarıyla bağlanıldı!${NC}"
-sleep 2
 
 # Public IP al
 public_ip=$(curl -s ipinfo.io/ip)
@@ -80,6 +71,7 @@ fi
 
 # Güvenlik duvarı ayarları
 echo -e "${BLUE}🔒 Güvenlik duvarı yapılandırılıyor...${NC}"
+apt install ufw -y
 ufw allow ssh
 ufw allow 40400
 ufw allow 40500
@@ -87,13 +79,7 @@ ufw allow 8080
 ufw --force enable
 
 # Cüzdan bilgisi
-read -p "🔐 EVM cüzdan adresinizi girin: " COINBASE
-
-# Ortam değişkenlerini ayarla
-export DATA_DIRECTORY=/root/aztec-kurdu-data/
-export COINBASE=$COINBASE
-export LOG_LEVEL=debug
-export P2P_MAX_TX_POOL_SIZE=1000000000
+read -p "🔐 EVM cüzdan adresinizi girin (0x ile başlayan): " COINBASE
 
 # RPC ve doğrulayıcı bilgileri
 echo -e "${GREEN}Şimdi gerekli RPC ve doğrulayıcı bilgilerini gireceğiz${NC}"
@@ -104,20 +90,94 @@ echo -e "${YELLOW}Consensus URL'i https://console.chainstack.com/user/login adre
 read -p "🛰️ Ethereum Beacon Consensus RPC URL'nizi girin: " CONSENSUS_URL
 
 read -p "📡 Kaydettiğiniz public IP adresinizi girin: " LOCAL_IP
-read -p "🔑 Doğrulayıcı özel anahtarınızı girin: " PRIVATE_KEY
+read -p "🔑 Doğrulayıcı özel anahtarınızı girin (0x olmadan girebilirsiniz): " PRIVATE_KEY
 
-# Aztec node'unu başlat
-echo -e "${CYAN}🚦 KriptoKurdu Aztec node başlatılıyor...${NC}"
-aztec start \
-  --network alpha-testnet \
-  --l1-rpc-urls "$RPC_URL" \
-  --l1-consensus-host-urls "$CONSENSUS_URL" \
-  --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
-  --p2p.p2pIp "$LOCAL_IP" \
-  --p2p.maxTxPoolSize 1000000000 \
-  --archiver \
-  --node \
-  --sequencer
+# 0x ekle eğer yoksa
+if [[ ! $PRIVATE_KEY =~ ^0x ]]; then
+    PRIVATE_KEY="0x$PRIVATE_KEY"
+fi
 
-echo -e "${GREEN}✅ KriptoKurdu Aztec Node başarıyla kuruldu ve çalışıyor!${NC}"
+# Docker tabanlı kurulum
+if [ "$INSTALL_TYPE" = "1" ]; then
+  echo -e "${CYAN}🚀 Docker ile Aztec node başlatılıyor...${NC}"
+  
+  # Eski container silinsin
+  docker rm -f kriptokurdu-aztec-node 2>/dev/null
+  
+  # Node başlat
+  docker run -d --name kriptokurdu-aztec-node \
+    -e HOME=/root \
+    -e FORCE_COLOR=1 \
+    -e P2P_PORT=40400 \
+    -p 8080:8080 -p 40400:40400 -p 40400:40400/udp \
+    --add-host host.docker.internal:host-gateway \
+    --user 0:0 \
+    --entrypoint node \
+    aztecprotocol/aztec:0.85.0-alpha-testnet.8 \
+    /usr/src/yarn-project/aztec/dist/bin/index.js \
+    --node --archiver --sequencer \
+    --network alpha-testnet \
+    --l1-rpc-urls $RPC_URL \
+    --l1-consensus-host-urls $CONSENSUS_URL \
+    --sequencer.validatorPrivateKey $PRIVATE_KEY \
+    --sequencer.coinbase $COINBASE \
+    --p2p.p2pIp $LOCAL_IP \
+    --p2p.maxTxPoolSize 1000000000
+  
+  sleep 3
+  
+  # Kontrol et çalışıyor mu
+  if [ "$(docker ps -q -f name=kriptokurdu-aztec-node)" ]; then
+    echo -e "${GREEN}✅ KriptoKurdu Aztec Node başarıyla başlatıldı!${NC}"
+    echo -e "${BLUE}📝 Node loglarını görmek için: ${YELLOW}docker logs -f kriptokurdu-aztec-node${NC}"
+  else
+    echo -e "${RED}❌ Node başlatılırken bir sorun oluştu. Lütfen logları kontrol edin.${NC}"
+    echo -e "${YELLOW}docker logs kriptokurdu-aztec-node${NC}"
+  fi
+
+# CLI tabanlı kurulum
+else
+  echo -e "${CYAN}🚀 Aztec CLI yükleniyor...${NC}"
+  
+  # Aztec CLI kur (non-interactive)
+  curl -s https://install.aztec.network | bash -s -- -y
+  
+  # PATH'e ekle
+  echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+  echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bash_profile
+  export PATH="$HOME/.aztec/bin:$PATH"
+  
+  echo -e "${GREEN}✅ Aztec CLI başarıyla kuruldu!${NC}"
+  sleep 2
+  
+  # Testnet'e geçiş
+  echo -e "${CYAN}🌐 Alpha-testnet'e geçiliyor...${NC}"
+  aztec-up alpha-testnet &>/dev/null || true
+  
+  # Start script oluştur
+  echo -e "${CYAN}🚀 Node başlatma scripti oluşturuluyor...${NC}"
+  
+  cat > $HOME/start_kriptokurdu_aztec.sh <<EOFSCRIPT
+#!/bin/bash
+export PATH=\$PATH:\$HOME/.aztec/bin
+aztec start --node --archiver --sequencer \\
+  --network alpha-testnet \\
+  --l1-rpc-urls "$RPC_URL" \\
+  --l1-consensus-host-urls "$CONSENSUS_URL" \\
+  --sequencer.validatorPrivateKey "$PRIVATE_KEY" \\
+  --sequencer.coinbase "$COINBASE" \\
+  --p2p.p2pIp "$LOCAL_IP" \\
+  --p2p.maxTxPoolSize 1000000000
+EOFSCRIPT
+
+  chmod +x $HOME/start_kriptokurdu_aztec.sh
+  
+  echo -e "${CYAN}🚦 KriptoKurdu Aztec node başlatılıyor (screen oturumunda)...${NC}"
+  screen -dmS aztec $HOME/start_kriptokurdu_aztec.sh
+  
+  echo -e "${GREEN}✅ KriptoKurdu Aztec Node başarıyla başlatıldı!${NC}"
+  echo -e "${BLUE}📝 Node ekranını görmek için: ${YELLOW}screen -r aztec${NC}"
+  echo -e "${BLUE}📝 Screen oturumundan çıkmak için: ${YELLOW}CTRL + A ardından D${NC}"
+fi
+
 echo -e "${YELLOW}Bu node hakkında sorularınız için Telegram grubuna katılın: https://t.me/kriptokurdugrup${NC}"
