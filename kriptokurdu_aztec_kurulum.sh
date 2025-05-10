@@ -104,24 +104,21 @@ if [ "$INSTALL_TYPE" = "1" ]; then
   # Eski container silinsin
   docker rm -f kriptokurdu-aztec-node 2>/dev/null
   
-  # Node başlat
+  # Node başlat - DÜZELTİLMİŞ KOMUT
   docker run -d --name kriptokurdu-aztec-node \
     -e HOME=/root \
     -e FORCE_COLOR=1 \
-    -e P2P_PORT=40400 \
     -p 8080:8080 -p 40400:40400 -p 40400:40400/udp \
     --add-host host.docker.internal:host-gateway \
-    --user 0:0 \
-    --entrypoint node \
-    aztecprotocol/aztec:0.85.0-alpha-testnet.8 \
-    /usr/src/yarn-project/aztec/dist/bin/index.js \
+    aztecprotocol/aztec:latest \
+    start \
     --node --archiver --sequencer \
     --network alpha-testnet \
-    --l1-rpc-urls $RPC_URL \
-    --l1-consensus-host-urls $CONSENSUS_URL \
-    --sequencer.validatorPrivateKey $PRIVATE_KEY \
-    --sequencer.coinbase $COINBASE \
-    --p2p.p2pIp $LOCAL_IP \
+    --l1-rpc-urls "$RPC_URL" \
+    --l1-consensus-host-urls "$CONSENSUS_URL" \
+    --sequencer.validatorPrivateKey "$PRIVATE_KEY" \
+    --sequencer.coinbase "$COINBASE" \
+    --p2p.p2pIp "$LOCAL_IP" \
     --p2p.maxTxPoolSize 1000000000
   
   sleep 3
@@ -179,5 +176,25 @@ EOFSCRIPT
   echo -e "${BLUE}📝 Node ekranını görmek için: ${YELLOW}screen -r aztec${NC}"
   echo -e "${BLUE}📝 Screen oturumundan çıkmak için: ${YELLOW}CTRL + A ardından D${NC}"
 fi
+
+# Discord rolü rehberi
+echo -e "${PURPLE}======== DISCORD ROLÜ ALMA REHBERİ ========${NC}"
+echo -e "${CYAN}Discord 'Apprentice' rolü almak için node 5 dakika çalıştıktan sonra:${NC}"
+echo -e "${YELLOW}1. Block numarası almak için:${NC}"
+echo -e "${GREEN}curl -s -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"node_getL2Tips\",\"params\":[],\"id\":67}' http://localhost:8080 | jq -r \".result.proven.number\"${NC}"
+echo
+echo -e "${YELLOW}2. Proof almak için (BLOCK yerine az önce aldığınız numarayı yazın):${NC}"
+echo -e "${GREEN}curl -s -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"BLOCK\",\"BLOCK\"],\"id\":67}' http://localhost:8080 | jq -r \".result\"${NC}"
+echo
+echo -e "${YELLOW}3. Discord'da rol almak için:${NC}"
+echo -e "${GREEN}- https://discord.gg/aztec adresine katılın${NC}"
+echo -e "${GREEN}- #operators > start-here kanalına girin${NC}"
+echo -e "${GREEN}- /operator start komutunu yazın${NC}"
+echo -e "${GREEN}- Wallet adresinizi, block numaranızı ve proof'u girin${NC}"
+
+# Validator kaydı rehberi
+echo -e "${PURPLE}======== VALIDATOR KAYDI REHBERİ ========${NC}"
+echo -e "${CYAN}Node senkronize olduktan sonra validator olarak kaydolmak için:${NC}"
+echo -e "${GREEN}bash -c \"$(curl -fsSL https://raw.githubusercontent.com/UfukNode/aztec-sequencer-node/main/validator_kayıt.sh)\"${NC}"
 
 echo -e "${YELLOW}Bu node hakkında sorularınız için Telegram grubuna katılın: https://t.me/kriptokurdugrup${NC}"
